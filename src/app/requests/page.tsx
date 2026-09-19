@@ -20,6 +20,8 @@ type ClientRequest = {
   technicianUid?: string | null;
   media?: Media[];
   createdAt?: string;
+  reviewedByAdmin?: boolean;
+  reviewedAt?: string | null;
 };
 
 const TABS: { key: Tab; label: string }[] = [
@@ -61,6 +63,11 @@ export default function ClientRequestsPage() {
   const [listLoading, setListLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Which request currently has an accept/decline call in flight, so only
+  // that card's buttons show a busy state rather than the whole list.
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const fetchRequests = useCallback(async () => {
     const token = await getIdToken();
     if (!token) return;
@@ -92,6 +99,52 @@ export default function ClientRequestsPage() {
   useEffect(() => {
     if (user) fetchRequests();
   }, [user, fetchRequests]);
+
+  async function handleAccept(id: string) {
+    setActionError(null);
+    setActionLoadingId(id);
+    try {
+      const token = await getIdToken();
+      if (!token) throw new Error("You need to be signed in to do that.");
+      const res = await fetch(`/api/admin/requests/${id}/accept`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Couldn't accept this request.");
+      // Reflect it immediately rather than waiting on a refetch.
+      setRequests((prev) =>
+        prev.map((r) => (r._id === id ? { ...r, reviewedByAdmin: true, reviewedAt: new Date().toISOString() } : r))
+      );
+    } catch (err: any) {
+      setActionError(err.message || "Couldn't accept this request.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  async function handleDecline(id: string) {
+    setActionError(null);
+    setActionLoadingId(id);
+    try {
+      const token = await getIdToken();
+      if (!token) throw new Error("You need to be signed in to do that.");
+      const res = await fetch(`/api/admin/requests/${id}/decline`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Couldn't decline this request.");
+      // Declined requests move to the Cancelled tab — drop it from this
+      // list and refresh the tab counts.
+      setRequests((prev) => prev.filter((r) => r._id !== id));
+      fetchRequests();
+    } catch (err: any) {
+      setActionError(err.message || "Couldn't decline this request.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
 
   if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-slate-400">Loading...</div>;
@@ -140,6 +193,12 @@ export default function ClientRequestsPage() {
           </div>
         )}
 
+        {actionError && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
+            {actionError}
+          </div>
+        )}
+
         {listLoading ? (
           <p className="text-sm text-slate-400">Loading...</p>
         ) : requests.length === 0 ? (
@@ -151,6 +210,10 @@ export default function ClientRequestsPage() {
             {requests.map((r) => {
               const media = Array.isArray(r.media) ? r.media : [];
               const status = r.status || "pending";
+              const isActing = actionLoadingId === r._id;
+              // Only offer accept/decline on requests that aren't already
+              // dispatched/completed/cancelled — those are settled.
+              const canAct = tab === "new";
               return (
                 <article key={r._id} className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -158,13 +221,20 @@ export default function ClientRequestsPage() {
                       <p className="text-sm font-bold text-slate-900">{r.category || "No trade picked"}</p>
                       <p className="text-xs text-slate-400 mt-0.5">Posted {posted(r.createdAt)}</p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${
-                        STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {status.replace(/_/g, " ")}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${
+                          STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {status.replace(/_/g, " ")}
+                      </span>
+                      {r.reviewedByAdmin && (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          ✓ Reviewed
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
@@ -211,6 +281,29 @@ export default function ClientRequestsPage() {
                           </a>
                         )
                       )}
+                    </div>
+                  )}
+
+                  {canAct && (
+                    <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                      {!r.reviewedByAdmin && (
+                        <button
+                          type="button"
+                          disabled={isActing}
+                          onClick={() => handleAccept(r._id)}
+                          className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {isActing ? "…" : "Accept"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isActing}
+                        onClick={() => handleDecline(r._id)}
+                        className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {isActing ? "…" : "Decline"}
+                      </button>
                     </div>
                   )}
                 </article>
