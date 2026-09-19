@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminToken } from "@/middleware/auth";
+import { verifyAdminToken } from "@/middleware/adminAuth";
 import { connectToDatabase } from "@/lib/mongodb";
 import Job from "@/models/Job";
 import { JOB_STATUS, type JobStatusValue } from "@/lib/constants";
@@ -24,7 +24,10 @@ const TAB_STATUSES: Record<Tab, JobStatusValue[]> = {
  */
 export async function GET(req: NextRequest) {
   try {
-    await verifyAdminToken(req);
+    // verifyAdminToken does not throw. On failure it RETURNS a 401/403 response,
+    // so that response must be returned here or the route would run for anyone.
+    const admin = await verifyAdminToken(req);
+    if (admin instanceof NextResponse) return admin;
     await connectToDatabase();
 
     const tabParam = req.nextUrl.searchParams.get("tab") || "new";

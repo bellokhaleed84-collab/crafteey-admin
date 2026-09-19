@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   try {
-    await verifyAdminToken(req);
+    // verifyAdminToken does not throw. On failure it RETURNS a 401/403 response,
+    // so that response must be returned here or the route would run for anyone.
+    const admin = await verifyAdminToken(req);
+    if (admin instanceof NextResponse) return admin;
     await connectToDatabase();
 
     const status = req.nextUrl.searchParams.get("status");

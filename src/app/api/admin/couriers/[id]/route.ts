@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminToken } from "@/middleware/auth";
+import { verifyAdminToken } from "@/middleware/adminAuth";
 import { connectToDatabase } from "@/lib/mongodb";
 import Courier from "@/models/Courier";
 import { COURIER_STATUS } from "@/lib/constants";
@@ -7,7 +7,10 @@ import { apiError } from "@/lib/apiError";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await verifyAdminToken(req);
+    // verifyAdminToken does not throw. On failure it RETURNS a 401/403 response,
+    // so that response must be returned here or the route would run for anyone.
+    const admin = await verifyAdminToken(req);
+    if (admin instanceof NextResponse) return admin;
     await connectToDatabase();
 
     const body = await req.json();
