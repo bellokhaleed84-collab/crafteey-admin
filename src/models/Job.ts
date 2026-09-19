@@ -22,6 +22,13 @@ export interface IJob extends Document {
   scheduledFor: string;
   price: number;
 
+  // --- admin review — separate from dispatch status. "Accept" on the
+  // requests list just means an admin has looked at it and it's not
+  // being ignored; the job doesn't move to DISPATCHED until a
+  // technician is actually assigned.
+  reviewedByAdmin: boolean;
+  reviewedAt: Date | null;
+
   // --- dispatch
   status: JobStatusValue;
   technicianUid: string | null;
@@ -55,6 +62,9 @@ const JobSchema = new Schema<IJob>(
 
     scheduledFor: { type: String, default: "" },
     price: { type: Number, default: 0, min: 0 },
+
+    reviewedByAdmin: { type: Boolean, default: false },
+    reviewedAt: { type: Date, default: null },
 
     status: {
       type: String,
