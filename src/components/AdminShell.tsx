@@ -47,7 +47,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Orders", href: "/orders", icon: ShoppingBag, permission: "orders.view", ready: false },
+      { label: "Orders", href: "/orders", icon: ShoppingBag, permission: "orders.view", ready: true },
       { label: "Client requests", href: "/requests", icon: ClipboardList, permission: "requests.view", ready: true },
       { label: "Technician jobs", href: "/jobs", icon: Briefcase, permission: "jobs.view", ready: true },
     ],

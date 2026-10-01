@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminToken } from "@/middleware/adminAuth";
+import mongoose from "mongoose";
+import { requirePermission } from "@/middleware/adminAuth";
 import { connectToDatabase } from "@/lib/mongodb";
 import Job from "@/models/Job";
+import { logAudit } from "@/lib/audit";
 import { apiError } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
 /**
  * PATCH /api/admin/requests/[id]/accept
- * Marks a client request as reviewed by an admin. Does NOT change
- * `status` — a job only becomes DISPATCHED once a technician is actually
- * assigned, which is a separate step. This just means "seen, not
- * ignored" so it's safe to leave sitting in the New tab.
+ * Marks a client request as reviewed. Does NOT change `status`.
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const admin = await verifyAdminToken(req);
+    const admin = await requirePermission(req, "requests.manage");
     if (admin instanceof NextResponse) return admin;
+
+    if (!mongoose.isValidObjectId(params.id)) {
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
+    }
     await connectToDatabase();
 
     const job = await Job.findByIdAndUpdate(
@@ -28,6 +31,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!job) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
+
+    await logAudit(admin, {
+      action: "request.accept",
+      targetType: "Job",
+      targetId: params.id,
+      summary: `Reviewed client request${job.category ? ` (${job.category})` : ""}`,
+    });
 
     return NextResponse.json({ request: job });
   } catch (err) {

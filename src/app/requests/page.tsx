@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import AdminNav from "@/components/AdminNav";
 
 type Tab = "new" | "active" | "done" | "cancelled";
 
@@ -54,8 +52,7 @@ function posted(iso?: string) {
 }
 
 export default function ClientRequestsPage() {
-  const { user, loading, getIdToken } = useAdminAuth();
-  const router = useRouter();
+  const { getIdToken, can } = useAdminAuth();
 
   const [tab, setTab] = useState<Tab>("new");
   const [requests, setRequests] = useState<ClientRequest[]>([]);
@@ -93,12 +90,8 @@ export default function ClientRequestsPage() {
   }, [getIdToken, tab]);
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
-
-  useEffect(() => {
-    if (user) fetchRequests();
-  }, [user, fetchRequests]);
+    fetchRequests();
+  }, [fetchRequests]);
 
   async function handleAccept(id: string) {
     setActionError(null);
@@ -135,7 +128,7 @@ export default function ClientRequestsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Couldn't decline this request.");
-      // Declined requests move to the Cancelled tab — drop it from this
+      // Declined requests move to the Cancelled tab. Drop it from this
       // list and refresh the tab counts.
       setRequests((prev) => prev.filter((r) => r._id !== id));
       fetchRequests();
@@ -146,172 +139,164 @@ export default function ClientRequestsPage() {
     }
   }
 
-  if (loading || !user) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-slate-400">Loading...</div>;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <AdminNav />
+    <div className="mx-auto max-w-3xl">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-bold text-slate-900">Client requests</h2>
+        <button
+          type="button"
+          onClick={fetchRequests}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+        >
+          Refresh
+        </button>
+      </div>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-slate-900">Client requests</h2>
+      <div className="mb-5 flex gap-1 overflow-x-auto whitespace-nowrap text-sm font-semibold [scrollbar-width:none]">
+        {TABS.map((t) => (
           <button
+            key={t.key}
             type="button"
-            onClick={fetchRequests}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+            onClick={() => setTab(t.key)}
+            aria-pressed={tab === t.key}
+            className={`rounded-lg px-3 py-2 ${
+              tab === t.key
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-500 hover:text-slate-900 border border-slate-100"
+            }`}
           >
-            Refresh
+            {t.label}
+            <span className={`ml-1.5 text-xs ${tab === t.key ? "text-slate-300" : "text-slate-400"}`}>
+              {counts[t.key] ?? 0}
+            </span>
           </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
+          {error}
         </div>
+      )}
 
-        <div className="mb-5 flex gap-1 overflow-x-auto whitespace-nowrap text-sm font-semibold [scrollbar-width:none]">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              aria-pressed={tab === t.key}
-              className={`rounded-lg px-3 py-2 ${
-                tab === t.key
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-500 hover:text-slate-900 border border-slate-100"
-              }`}
-            >
-              {t.label}
-              <span className={`ml-1.5 text-xs ${tab === t.key ? "text-slate-300" : "text-slate-400"}`}>
-                {counts[t.key] ?? 0}
-              </span>
-            </button>
-          ))}
+      {actionError && (
+        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
+          {actionError}
         </div>
+      )}
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
-            {error}
-          </div>
-        )}
-
-        {actionError && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
-            {actionError}
-          </div>
-        )}
-
-        {listLoading ? (
-          <p className="text-sm text-slate-400">Loading...</p>
-        ) : requests.length === 0 ? (
-          <p className="text-sm text-slate-400">
-            {tab === "new" ? "No new requests right now." : "Nothing here yet."}
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {requests.map((r) => {
-              const media = Array.isArray(r.media) ? r.media : [];
-              const status = r.status || "pending";
-              const isActing = actionLoadingId === r._id;
-              // Only offer accept/decline on requests that aren't already
-              // dispatched/completed/cancelled — those are settled.
-              const canAct = tab === "new";
-              return (
-                <article key={r._id} className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900">{r.category || "No trade picked"}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Posted {posted(r.createdAt)}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${
-                          STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {status.replace(/_/g, " ")}
-                      </span>
-                      {r.reviewedByAdmin && (
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          ✓ Reviewed
-                        </span>
-                      )}
-                    </div>
+      {listLoading ? (
+        <p className="text-sm text-slate-400">Loading...</p>
+      ) : requests.length === 0 ? (
+        <p className="text-sm text-slate-400">
+          {tab === "new" ? "No new requests right now." : "Nothing here yet."}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {requests.map((r) => {
+            const media = Array.isArray(r.media) ? r.media : [];
+            const status = r.status || "pending";
+            const isActing = actionLoadingId === r._id;
+            // Only offer accept/decline on new requests, and only to roles
+            // that are allowed to manage them.
+            const canAct = tab === "new" && can("requests.manage");
+            return (
+              <article key={r._id} className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{r.category || "No trade picked"}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Posted {posted(r.createdAt)}</p>
                   </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${
+                        STATUS_STYLE[status] ?? "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {status.replace(/_/g, " ")}
+                    </span>
+                    {r.reviewedByAdmin && (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        ✓ Reviewed
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
-                    {r.description || "No description."}
-                  </p>
+                <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
+                  {r.description || "No description."}
+                </p>
 
-                  <p className="mt-3 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-600">Where:</span> {r.address || "Not given"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-600">Client:</span> {r.clientName || "Unnamed"}
-                    {r.clientPhone ? (
-                      <>
-                        {" · "}
-                        <a href={`tel:${r.clientPhone}`} className="underline underline-offset-2">
-                          {r.clientPhone}
-                        </a>
-                      </>
-                    ) : null}
-                  </p>
+                <p className="mt-3 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-600">Where:</span> {r.address || "Not given"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-600">Client:</span> {r.clientName || "Unnamed"}
+                  {r.clientPhone ? (
+                    <>
+                      {" · "}
+                      <a href={`tel:${r.clientPhone}`} className="underline underline-offset-2">
+                        {r.clientPhone}
+                      </a>
+                    </>
+                  ) : null}
+                </p>
 
-                  {media.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {media.map((m, i) =>
-                        m.type === "video" ? (
-                          <a
-                            key={`${m.url}-${i}`}
-                            href={m.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200"
-                          >
-                            Play video
-                          </a>
-                        ) : (
-                          <a key={`${m.url}-${i}`} href={m.url} target="_blank" rel="noopener noreferrer">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={m.url}
-                              alt={`Photo ${i + 1} from the client`}
-                              loading="lazy"
-                              className="h-20 w-20 rounded-lg object-cover bg-slate-100"
-                            />
-                          </a>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                  {canAct && (
-                    <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
-                      {!r.reviewedByAdmin && (
-                        <button
-                          type="button"
-                          disabled={isActing}
-                          onClick={() => handleAccept(r._id)}
-                          className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                {media.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {media.map((m, i) =>
+                      m.type === "video" ? (
+                        <a
+                          key={`${m.url}-${i}`}
+                          href={m.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200"
                         >
-                          {isActing ? "…" : "Accept"}
-                        </button>
-                      )}
+                          Play video
+                        </a>
+                      ) : (
+                        <a key={`${m.url}-${i}`} href={m.url} target="_blank" rel="noopener noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={m.url}
+                            alt={`Photo ${i + 1} from the client`}
+                            loading="lazy"
+                            className="h-20 w-20 rounded-lg object-cover bg-slate-100"
+                          />
+                        </a>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {canAct && (
+                  <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                    {!r.reviewedByAdmin && (
                       <button
                         type="button"
                         disabled={isActing}
-                        onClick={() => handleDecline(r._id)}
-                        className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        onClick={() => handleAccept(r._id)}
+                        className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                       >
-                        {isActing ? "…" : "Decline"}
+                        {isActing ? "…" : "Accept"}
                       </button>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </main>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isActing}
+                      onClick={() => handleDecline(r._id)}
+                      className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {isActing ? "…" : "Decline"}
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
