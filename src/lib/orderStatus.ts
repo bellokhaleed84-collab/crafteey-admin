@@ -1,14 +1,25 @@
-// CHECK: copy the real HUB_ORDER_STATUSES from crafteey-client/src/lib/hub/config.ts.
-// Only the FINISHED states need to be right. A "live" order is any paid order
-// that is not in one of these lists, so new in-between statuses work on their own.
-export const DELIVERED_STATUSES: string[] = ["delivered", "completed"];
-export const CANCELLED_STATUSES: string[] = ["cancelled", "canceled", "refunded"];
-export const UNPAID_STATUSES: string[] = ["pending_payment", "payment_failed", "failed"];
+// Mirrors HUB_ORDER_STATUSES in crafteey-client/src/lib/hub/config.ts.
+// If the client app adds a status, add it here too.
+export const HUB_ORDER_STATUS_LABELS: Record<string, string> = {
+  pending_payment: "Awaiting payment",
+  paid: "Paid",
+  preparing: "Preparing",
+  out_for_delivery: "On the way",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
 
+export const DELIVERED_STATUSES: string[] = ["delivered"];
+export const CANCELLED_STATUSES: string[] = ["cancelled"];
+export const UNPAID_STATUSES: string[] = ["pending_payment"];
+
+// A "live" order is paid and not in any of these.
 export const TERMINAL_STATUSES: string[] = [...DELIVERED_STATUSES, ...CANCELLED_STATUSES, ...UNPAID_STATUSES];
 
+// Labels the order statuses above, and also the rider's delivery statuses (accepted, picked_up...).
 export function statusLabel(status?: string): string {
-  return (status || "unknown").replace(/_/g, " ");
+  const s = status || "";
+  return HUB_ORDER_STATUS_LABELS[s] ?? (s ? s.replace(/_/g, " ") : "unknown");
 }
 
 export function statusStyle(status?: string): string {
