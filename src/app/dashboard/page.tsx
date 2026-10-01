@@ -1,138 +1,112 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { ROLE_LABELS, type Permission } from "@/lib/permissions";
 
-type Technician = {
-  _id: string;
-  firebaseUid: string;
-  name: string;
-  email: string;
-  phone: string;
-  categories: string[];
-  yearsExperience: number;
-  baseArea: string;
-  status: "pending" | "approved" | "rejected" | "suspended" | "blacklisted";
-  createdAt: string;
+type Overview = {
+  technicians?: { pending: number; approved: number };
+  riders?: { pending: number; approved: number; online: number };
 };
 
+function StatCard({ label, value, hint, href }: { label: string; value: number | string; hint?: string; href?: string }) {
+  const body = (
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:shadow">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
+      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+    </div>
+  );
+  return href ? <Link href={href}>{body}</Link> : body;
+}
+
+const ACTIONS: { label: string; href: string; permission: Permission }[] = [
+  { label: "Review technician applications", href: "/technicians", permission: "technicians.review" },
+  { label: "Review rider applications", href: "/riders", permission: "riders.review" },
+  { label: "Handle client requests", href: "/requests", permission: "requests.manage" },
+  { label: "Manage staff", href: "/staff", permission: "staff.manage" },
+  { label: "View the audit log", href: "/audit", permission: "audit.view" },
+];
+
 export default function DashboardPage() {
-  const { user, loading, getIdToken, signOut } = useAdminAuth();
-  const router = useRouter();
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [filter, setFilter] = useState<string>("pending");
-  const [listLoading, setListLoading] = useState(true);
-
-  const fetchTechnicians = useCallback(async () => {
-    const token = await getIdToken();
-    if (!token) return;
-    setListLoading(true);
-    const res = await fetch(`/api/technicians?status=${filter}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      setTechnicians(await res.json());
-    }
-    setListLoading(false);
-  }, [getIdToken, filter]);
+  const { admin, can, getIdToken } = useAdminAuth();
+  const [data, setData] = useState<Overview | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const res = await fetch("/api/admin/overview", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.error || "Couldn't load the overview.");
+        if (!cancelled) setData(json);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load the overview.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getIdToken]);
 
-  useEffect(() => {
-    if (user) fetchTechnicians();
-  }, [user, fetchTechnicians]);
-
-  async function updateStatus(uid: string, status: string) {
-    const token = await getIdToken();
-    if (!token) return;
-    await fetch(`/api/technicians/${uid}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status }),
-    });
-    fetchTechnicians();
-  }
-
-  if (loading || !user) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-slate-400">Loading...</div>;
-  }
+  const actions = ACTIONS.filter((a) => can(a.permission));
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <h1 className="font-bold text-lg text-slate-900">Crafteey Admin</h1>
-          <nav className="flex gap-4 text-sm font-semibold">
-            <Link href="/dashboard" className="text-slate-900">
-              Applications
-            </Link>
-            <Link href="/jobs" className="text-slate-500 hover:text-slate-900">
-              Jobs
-            </Link>
-          </nav>
-        </div>
-        <button onClick={signOut} className="text-sm font-semibold text-slate-500 hover:text-slate-900">
-          Sign out
-        </button>
-      </header>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Welcome, {admin?.name}</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          You&apos;re signed in as <span className="font-semibold text-slate-700">{admin ? ROLE_LABELS[admin.role] : ""}</span>.
+        </p>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex gap-2 mb-6">
-          {["pending", "approved", "rejected"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize ${
-                filter === s ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-        {listLoading ? (
-          <p className="text-sm text-slate-400">Loading...</p>
-        ) : technicians.length === 0 ? (
-          <p className="text-sm text-slate-400">No {filter} applications.</p>
-        ) : (
-          <div className="space-y-3">
-            {technicians.map((t) => (
-              <div key={t._id} className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-bold text-slate-900">{t.name}</p>
-                    <p className="text-sm text-slate-500">{t.email} · {t.phone}</p>
-                    <p className="text-sm text-slate-500 mt-1">
-                      {t.categories.join(", ")} · {t.yearsExperience} yrs · {t.baseArea}
-                    </p>
-                  </div>
-                  {filter === "pending" && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => updateStatus(t.firebaseUid, "rejected")}
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => updateStatus(t.firebaseUid, "approved")}
-                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white"
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {data && (data.technicians || data.riders) && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {data.technicians && (
+            <>
+              <StatCard
+                label="Technician applications"
+                value={data.technicians.pending}
+                hint="waiting for review"
+                href="/technicians"
+              />
+              <StatCard label="Approved technicians" value={data.technicians.approved} />
+            </>
+          )}
+          {data.riders && (
+            <>
+              <StatCard label="Rider applications" value={data.riders.pending} hint="waiting for review" href="/riders" />
+              <StatCard label="Riders online" value={data.riders.online} hint={`${data.riders.approved} approved in total`} href="/riders" />
+            </>
+          )}
+        </div>
+      )}
+
+      {actions.length > 0 && (
+        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-sm font-bold text-slate-900">Quick actions</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {actions.map((a) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="rounded-lg border border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                {a.label}
+              </Link>
             ))}
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }

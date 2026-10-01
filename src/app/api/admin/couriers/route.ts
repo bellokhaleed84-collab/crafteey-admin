@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminToken } from "@/middleware/adminAuth";
+import { requirePermission } from "@/middleware/adminAuth";
+import { hasPermission } from "@/lib/permissions";
 import { connectToDatabase } from "@/lib/mongodb";
 import Courier from "@/models/Courier";
 import { COURIER_STATUS, type CourierStatus } from "@/lib/constants";
@@ -14,9 +15,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   try {
-    // verifyAdminToken does not throw. On failure it RETURNS a 401/403 response,
-    // so that response must be returned here or the route would run for anyone.
-    const admin = await verifyAdminToken(req);
+    // Returns an error response (401/403) when the caller isn't allowed.
+    const admin = await requirePermission(req, "riders.view");
     if (admin instanceof NextResponse) return admin;
     await connectToDatabase();
 
@@ -27,6 +27,11 @@ export async function GET(req: NextRequest) {
     const query = isValid
       ? Courier.find({ status: status as CourierStatus })
       : Courier.find();
+
+    // ID details are for the people who approve riders, not everyone who can look.
+    if (!hasPermission(admin.role, "riders.review")) {
+      query.select("-idNumber -idPhotoUrl");
+    }
 
     const couriers = await query.sort({ createdAt: -1 }).limit(200).lean();
 
