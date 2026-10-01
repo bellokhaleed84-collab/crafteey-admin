@@ -79,7 +79,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Admin",
     items: [
-      { label: "Platform Settings", href: "/settings", icon: Settings, permission: "settings.manage", ready: false },
+      { label: "Platform Settings", href: "/settings", icon: Settings, permission: "settings.manage", ready: true },
       { label: "Staff Management", href: "/staff", icon: Users, permission: "staff.manage", ready: true },
       { label: "Audit Log", href: "/audit", icon: ScrollText, permission: "audit.view", ready: true },
     ],
