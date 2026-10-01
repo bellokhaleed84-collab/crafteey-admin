@@ -55,10 +55,10 @@ const GROUPS: NavGroup[] = [
   {
     label: "People",
     items: [
-      { label: "Vendors", href: "/vendors", icon: Store, permission: "vendors.view", ready: false },
+      { label: "Vendors", href: "/vendors", icon: Store, permission: "vendors.view", ready: true },
       { label: "Riders", href: "/riders", icon: Bike, permission: "riders.view", ready: true },
       { label: "Technicians", href: "/technicians", icon: Wrench, permission: "technicians.view", ready: true },
-      { label: "Customers", href: "/customers", icon: UserIcon, permission: "customers.view", ready: false },
+      { label: "Customers", href: "/customers", icon: UserIcon, permission: "customers.view", ready: true },
     ],
   },
   {

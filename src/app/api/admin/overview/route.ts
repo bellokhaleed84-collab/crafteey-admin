@@ -17,6 +17,9 @@ export const dynamic = "force-dynamic";
 
 const RIDER_DEBT_ALERT_KOBO = 500_000; // ₦5,000, the level where debt alerts start
 
+// Same rule as the Vendors page "Pending" tab: anything not approved, rejected or suspended.
+const VENDOR_KNOWN_STATUSES = ["approved", "rejected", "suspended"];
+
 // Midnight today in Lagos (UTC+1, no daylight saving), as a UTC Date.
 function startOfLagosDay(): Date {
   const HOUR = 60 * 60 * 1000;
@@ -95,7 +98,7 @@ export async function GET(req: NextRequest) {
 
     if (can("vendors.view")) {
       const [pending, approved, tierRequests] = await Promise.all([
-        Vendor.countDocuments({ status: "pending" }),
+        Vendor.countDocuments({ status: { $nin: VENDOR_KNOWN_STATUSES } }),
         Vendor.countDocuments({ status: "approved" }),
         Vendor.countDocuments({ "tierRequest.status": "pending" }),
       ]);
