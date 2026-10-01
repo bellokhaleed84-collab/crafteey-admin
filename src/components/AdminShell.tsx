@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -64,9 +64,9 @@ const GROUPS: NavGroup[] = [
   {
     label: "Money",
     items: [
-      { label: "Wallet & Transactions", href: "/wallet", icon: Wallet, permission: "wallet.view", ready: false },
-      { label: "Payouts", href: "/payouts", icon: Banknote, permission: "payouts.view", ready: false },
-      { label: "Reports & Exports", href: "/reports", icon: FileText, permission: "reports.view", ready: false },
+      { label: "Wallet & Transactions", href: "/wallet", icon: Wallet, permission: "wallet.view", ready: true },
+      { label: "Payouts", href: "/payouts", icon: Banknote, permission: "payouts.view", ready: true },
+      { label: "Reports & Exports", href: "/reports", icon: FileText, permission: "reports.view", ready: true },
     ],
   },
   {

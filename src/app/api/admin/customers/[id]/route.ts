@@ -10,6 +10,15 @@ import { apiError } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
+// Tells TypeScript exactly what the customer row contains, so it doesn't depend on Client.ts.
+type ClientRow = {
+  _id: unknown;
+  name?: string;
+  email?: string;
+  phone?: string;
+  createdAt?: Date;
+};
+
 /** GET /api/admin/customers/[id] (read-only): profile, order stats, last 10 orders. */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -20,7 +29,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
     await connectToDatabase();
 
-    const client = await Client.findById(params.id).select("name email phone createdAt").lean();
+    const client = await Client.findById(params.id)
+      .select("name email phone createdAt")
+      .lean<ClientRow | null>();
     if (!client) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
     const paid = { clientId: client._id, "payment.status": "success" };
@@ -49,7 +60,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (hasPermission(admin.role, "reports.view")) stats.spentKobo = agg?.spentKobo ?? 0;
 
     return NextResponse.json({
-      customer: { _id: String(client._id), name: client.name, email: client.email, phone: client.phone, createdAt: client.createdAt },
+      customer: {
+        _id: String(client._id),
+        name: client.name ?? "",
+        email: client.email ?? "",
+        phone: client.phone ?? "",
+        createdAt: client.createdAt,
+      },
       stats,
       recent: recent.map((o) => ({
         _id: String(o._id),

@@ -1,85 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { connectToDatabase } from "@/lib/mongodb";
-import HubOrder from "@/models/HubOrder";
-import CourierRequest from "@/models/CourierRequest";
-import Client from "@/models/Client";
 import { requirePermission } from "@/middleware/adminAuth";
 import { hasPermission } from "@/lib/permissions";
+import { connectToDatabase } from "@/lib/mongodb";
+import Client from "@/models/Client";
+import HubOrder from "@/models/HubOrder";
+import { CANCELLED_STATUSES } from "@/lib/orderStatus";
 import { apiError } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
+// Tells TypeScript exactly what the customer row contains, so it doesn't depend on Client.ts.
+type ClientRow = {
+  _id: unknown;
+  name?: string;
+  email?: string;
+  phone?: string;
+  createdAt?: Date;
+};
+
+/** GET /api/admin/customers/[id] (read-only): profile, order stats, last 10 orders. */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const admin = await requirePermission(req, "orders.view");
+    const admin = await requirePermission(req, "customers.view");
     if (admin instanceof NextResponse) return admin;
-
     if (!mongoose.isValidObjectId(params.id)) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
     await connectToDatabase();
 
-    const order = await HubOrder.findById(params.id).lean();
-    if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    const client = await Client.findById(params.id)
+      .select("name email phone createdAt")
+      .lean<ClientRow | null>();
+    if (!client) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
-    const [courier, customer] = await Promise.all([
-      CourierRequest.findOne({ hubOrderId: String(order._id) })
-        .select("status courierName courierPhone riderEarningKobo updatedAt")
+    const paid = { clientId: client._id, "payment.status": "success" };
+    const [recent, [agg]] = await Promise.all([
+      HubOrder.find(paid)
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select("orderNumber vendorName status totalKobo createdAt")
         .lean(),
-      Client.findById(order.clientId).select("name email phone").lean(),
+      HubOrder.aggregate<{ orders: number; cancelled: number; spentKobo: number }>([
+        { $match: paid },
+        {
+          $group: {
+            _id: null,
+            orders: { $sum: 1 },
+            cancelled: { $sum: { $cond: [{ $in: ["$status", CANCELLED_STATUSES] }, 1, 0] } },
+            spentKobo: {
+              $sum: { $cond: [{ $in: ["$status", CANCELLED_STATUSES] }, 0, { $ifNull: ["$totalKobo", 0] }] },
+            },
+          },
+        },
+      ]),
     ]);
 
-    // The revenue split is for roles that see reports (Finance, Super Admin).
-    const seesSplit = hasPermission(admin.role, "reports.view");
+    const stats: Record<string, number> = { orders: agg?.orders ?? 0, cancelled: agg?.cancelled ?? 0 };
+    if (hasPermission(admin.role, "reports.view")) stats.spentKobo = agg?.spentKobo ?? 0;
 
     return NextResponse.json({
-      order: {
-        _id: String(order._id),
-        orderNumber: order.orderNumber,
-        status: order.status,
-        vendorName: order.vendorName,
-        vehicleType: order.vehicleType,
-        items: order.items ?? [],
-        subtotalKobo: order.subtotalKobo,
-        deliveryFeeKobo: order.deliveryFeeKobo,
-        totalKobo: order.totalKobo,
-        payment: {
-          status: order.payment?.status ?? "",
-          paidAt: order.payment?.paidAt ?? null,
-          channel: order.payment?.channel ?? "",
-          reference: order.payment?.reference ?? "",
-        },
-        delivery: order.delivery ?? {},
-        createdAt: order.createdAt,
-        vendorAcceptedAt: order.vendorAcceptedAt ?? null,
-        readyForPickupAt: order.readyForPickupAt ?? null,
-        cancelledBy: order.cancelledBy ?? null,
-        cancelReason: order.cancelReason ?? null,
-        refund: order.refund?.status ? order.refund : null,
+      customer: {
+        _id: String(client._id),
+        name: client.name ?? "",
+        email: client.email ?? "",
+        phone: client.phone ?? "",
+        createdAt: client.createdAt,
       },
-      customer: customer
-        ? { name: customer.name, email: customer.email, phone: customer.phone }
-        : null,
-      courier: courier
-        ? {
-            status: courier.status,
-            name: courier.courierName,
-            phone: courier.courierPhone,
-            ...(seesSplit ? { earningKobo: courier.riderEarningKobo } : {}),
-          }
-        : null,
-      split: seesSplit
-        ? {
-            vendorTier: order.vendorTier,
-            vendorPayoutKobo: order.vendorPayoutKobo,
-            platformVendorRevenueKobo: order.platformVendorRevenueKobo,
-            riderEarningKobo: order.riderEarningKobo,
-            platformCommissionKobo: order.platformCommissionKobo,
-          }
-        : null,
+      stats,
+      recent: recent.map((o) => ({
+        _id: String(o._id),
+        orderNumber: o.orderNumber,
+        vendorName: o.vendorName,
+        status: o.status,
+        totalKobo: o.totalKobo,
+        createdAt: o.createdAt,
+      })),
     });
   } catch (err) {
-    return apiError(err, "GET /api/admin/orders/[id]");
+    return apiError(err, "GET /api/admin/customers/[id]");
   }
 }

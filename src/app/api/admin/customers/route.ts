@@ -11,6 +11,15 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
 
+// Tells TypeScript exactly what a customer row contains, so it doesn't depend on Client.ts.
+type ClientRow = {
+  _id: unknown;
+  name?: string;
+  email?: string;
+  phone?: string;
+  createdAt?: Date;
+};
+
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -38,7 +47,7 @@ export async function GET(req: NextRequest) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * PAGE_SIZE)
         .limit(PAGE_SIZE)
-        .lean(),
+        .lean<ClientRow[]>(),
       Client.countDocuments(filter),
     ]);
 
@@ -65,9 +74,9 @@ export async function GET(req: NextRequest) {
         const s = byId.get(String(c._id));
         return {
           _id: String(c._id),
-          name: c.name,
-          email: c.email,
-          phone: c.phone,
+          name: c.name ?? "",
+          email: c.email ?? "",
+          phone: c.phone ?? "",
           createdAt: c.createdAt,
           orders: s?.orders ?? 0,
           ...(seesMoney ? { spentKobo: s?.spentKobo ?? 0 } : {}),

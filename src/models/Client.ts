@@ -1,21 +1,57 @@
-import mongoose, { Schema, type Model } from "mongoose";
+import mongoose, { Schema, type Document, type Model } from "mongoose";
+import { COURIER_STATUS, VEHICLE_TYPES, type CourierStatus } from "@/lib/constants";
 
-// Read-only copy of crafteey-client's Client (same "clients" collection).
-export interface IClient {
+export interface ICourier extends Document {
   firebaseUid: string;
   name: string;
-  email: string;
   phone: string;
+  vehicleType: string;
+  vehiclePlate: string;
+  idNumber: string;
+  idPhotoUrl: string;
+  status: CourierStatus;
+  isOnline: boolean;
+  currentLocation: { lat: number; lng: number } | null;
+  // Money fields, written by crafteey-rider. Old couriers may not have them, so read with ?? 0.
+  walletBalanceKobo?: number;
+  debtKobo?: number;
+  lifetimeEarningsKobo?: number;
+  accountSuspended?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const ClientSchema = new Schema<IClient>(
-  { firebaseUid: String, name: String, email: String, phone: String },
-  { timestamps: true, autoIndex: false }
+// IMPORTANT: field names here must match crafteey-rider's src/models/Courier.ts
+// exactly — both apps read/write the same "couriers" collection in the same
+// database. If you add a field on one side, add it here too.
+const CourierSchema = new Schema<ICourier>(
+  {
+    firebaseUid: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    phone: { type: String, required: true },
+    vehicleType: { type: String, enum: VEHICLE_TYPES, required: true },
+    vehiclePlate: { type: String, default: "" },
+    idNumber: { type: String, default: "" },
+    idPhotoUrl: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: Object.values(COURIER_STATUS),
+      default: COURIER_STATUS.PENDING,
+    },
+    isOnline: { type: Boolean, default: false },
+    currentLocation: {
+      type: new Schema({ lat: Number, lng: Number }, { _id: false }),
+      default: null,
+    },
+    walletBalanceKobo: Number,
+    debtKobo: Number,
+    lifetimeEarningsKobo: Number,
+    accountSuspended: Boolean,
+  },
+  { timestamps: true }
 );
 
-const Client: Model<IClient> =
-  (mongoose.models.Client as Model<IClient>) || mongoose.model<IClient>("Client", ClientSchema);
+const Courier: Model<ICourier> =
+  mongoose.models.Courier || mongoose.model<ICourier>("Courier", CourierSchema);
 
-export default Client;
+export default Courier;
