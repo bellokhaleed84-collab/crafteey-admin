@@ -11,6 +11,7 @@ import {
   Bike,
   ShoppingBag,
   Store,
+  Building2,
   User as UserIcon,
   Wallet,
   Banknote,
@@ -56,6 +57,7 @@ const GROUPS: NavGroup[] = [
     label: "People",
     items: [
       { label: "Vendors", href: "/vendors", icon: Store, permission: "vendors.view", ready: true },
+      { label: "Companies", href: "/companies", icon: Building2, permission: "companies.view", ready: true },
       { label: "Riders", href: "/riders", icon: Bike, permission: "riders.view", ready: true },
       { label: "Technicians", href: "/technicians", icon: Wrench, permission: "technicians.view", ready: true },
       { label: "Customers", href: "/customers", icon: UserIcon, permission: "customers.view", ready: true },
@@ -93,6 +95,41 @@ const PUBLIC_ROUTES = ["/login", "/staff-signup"];
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-sm text-slate-500">{children}</div>;
+}
+
+// Grey pulsing placeholder of the whole admin screen, shown while the app
+// checks who is signed in.
+function ShellSkeleton() {
+  return (
+    <div className="min-h-screen bg-slate-50" aria-busy="true">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 bg-[#0B1530] p-5 md:block">
+        <div className="h-6 w-32 animate-pulse rounded bg-white/10" />
+        <div className="mt-8 space-y-3">
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-8 animate-pulse rounded-lg bg-white/10" />
+          ))}
+        </div>
+      </aside>
+      <div className="md:pl-64">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 md:hidden">
+          <div className="h-5 w-28 animate-pulse rounded bg-slate-200" />
+          <div className="h-9 w-9 animate-pulse rounded-lg bg-slate-200" />
+        </div>
+        <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+          <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="h-3 w-1/2 rounded bg-slate-200" />
+                <div className="mt-4 h-8 w-1/3 rounded bg-slate-200" />
+                <div className="mt-3 h-3 w-2/3 rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -142,9 +179,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   if (isPublicRoute) return <>{children}</>;
 
-  if (loading) return <FullScreenMessage>Loading…</FullScreenMessage>;
+  if (loading) return <ShellSkeleton />;
   if (!user || access === "signed_out") return <FullScreenMessage>Redirecting to sign in…</FullScreenMessage>;
-  if (access === "loading") return <FullScreenMessage>Checking your access…</FullScreenMessage>;
+  if (access === "loading") return <ShellSkeleton />;
   if (access === "needs_verification") return <VerifyEmailScreen />;
 
   if (access === "no_access" || access === "error") {
