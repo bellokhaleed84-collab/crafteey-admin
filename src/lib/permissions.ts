@@ -23,17 +23,19 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   super_admin: "Full access, including staff management and the audit log.",
-  operations: "Live orders, client requests, technician jobs, and viewing riders and vendors.",
-  onboarding: "Reviews technician, rider and vendor applications.",
+  operations: "Live orders, client requests, technician jobs, and viewing riders, vendors and companies.",
+  onboarding: "Reviews technician, rider, vendor and company applications.",
   rider_management: "Reviews and manages riders.",
   finance: "Wallets, payouts, reports and other money views.",
-  support: "Customers, orders (view only), complaints and reviews.",
+  support: "Customers, orders (view only), complaints, reviews, disputes and chat moderation.",
 };
 
 export const PERMISSIONS = [
   "dashboard.view",
   "technicians.view",
   "technicians.review",
+  "companies.view",
+  "companies.review",
   "requests.view",
   "requests.manage",
   "jobs.view",
@@ -50,6 +52,8 @@ export const PERMISSIONS = [
   "wallet.adjust",
   "payouts.view",
   "payouts.run",
+  "disputes.manage",
+  "chat.moderate",
   "support.view",
   "support.manage",
   "reviews.manage",
@@ -65,6 +69,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   operations: [
     "dashboard.view",
     "technicians.view",
+    "companies.view",
     "requests.view",
     "requests.manage",
     "jobs.view",
@@ -79,6 +84,8 @@ const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
     "dashboard.view",
     "technicians.view",
     "technicians.review",
+    "companies.view",
+    "companies.review",
     "riders.view",
     "riders.review",
     "vendors.view",
@@ -87,6 +94,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   rider_management: ["dashboard.view", "riders.view", "riders.review", "riders.manage"],
   finance: [
     "dashboard.view",
+    "companies.view",
     "orders.view",
     "customers.view",
     "wallet.view",
@@ -97,12 +105,15 @@ const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   ],
   support: [
     "dashboard.view",
+    "companies.view",
     "customers.view",
     "orders.view",
     "wallet.view",
     "support.view",
     "support.manage",
     "reviews.manage",
+    "disputes.manage",
+    "chat.moderate",
   ],
 };
 
