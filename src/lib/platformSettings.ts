@@ -3,6 +3,7 @@ export type PlatformSettingsValues = {
   debtBlockKobo: number;
   riderSharePercent: number;
   commission: { basic: number; regular: number; premium: number };
+  companyCommissionPercent: number;
   withdrawalDays: number[]; // 0 = Sunday ... 6 = Saturday
 };
 
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: PlatformSettingsValues = {
   debtBlockKobo: 800_000,
   riderSharePercent: 80,
   commission: { basic: 15, regular: 20, premium: 30 },
+  companyCommissionPercent: 20,
   withdrawalDays: [1, 4],
 };
 
@@ -23,7 +25,8 @@ export function validateSettings(
 ): { ok: true; value: PlatformSettingsValues } | { ok: false; error: string } {
   if (!input || typeof input !== "object") return { ok: false, error: "Invalid settings." };
 
-  const { debtAlertKobo, debtBlockKobo, riderSharePercent, commission, withdrawalDays } = input;
+  const { debtAlertKobo, debtBlockKobo, riderSharePercent, commission, companyCommissionPercent, withdrawalDays } =
+    input;
 
   if (!isNum(debtAlertKobo) || !isNum(debtBlockKobo) || debtAlertKobo < 0 || debtBlockKobo <= 0) {
     return { ok: false, error: "Debt limits must be positive amounts." };
@@ -38,6 +41,9 @@ export function validateSettings(
   for (const t of tiers) {
     const v = commission?.[t];
     if (!isNum(v) || v < 0 || v > 50) return { ok: false, error: `The ${t} commission must be between 0% and 50%.` };
+  }
+  if (!isNum(companyCommissionPercent) || companyCommissionPercent < 0 || companyCommissionPercent > 50) {
+    return { ok: false, error: "The company commission must be between 0% and 50%." };
   }
   if (
     !Array.isArray(withdrawalDays) ||
@@ -54,6 +60,7 @@ export function validateSettings(
       debtBlockKobo: Math.round(debtBlockKobo),
       riderSharePercent,
       commission: { basic: commission.basic, regular: commission.regular, premium: commission.premium },
+      companyCommissionPercent,
       withdrawalDays: [...new Set<number>(withdrawalDays)].sort(),
     },
   };

@@ -10,6 +10,7 @@ type Form = {
   basic: string;
   regular: string;
   premium: string;
+  company: string;
   days: number[];
 };
 
@@ -45,6 +46,7 @@ export default function SettingsPage() {
         basic: String(s.commission.basic),
         regular: String(s.commission.regular),
         premium: String(s.commission.premium),
+        company: String(s.companyCommissionPercent),
         days: s.withdrawalDays,
       });
     } catch (e) {
@@ -85,6 +87,7 @@ export default function SettingsPage() {
           debtBlockKobo: Math.round(Number(form.debtBlock) * 100),
           riderSharePercent: Number(form.riderShare),
           commission: { basic: Number(form.basic), regular: Number(form.regular), premium: Number(form.premium) },
+          companyCommissionPercent: Number(form.company),
           withdrawalDays: form.days,
         }),
       });
@@ -107,12 +110,12 @@ export default function SettingsPage() {
 
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {saved && <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">Saved.</p>}
-      {loading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
+      {loading && <p className="mt-4 text-sm text-slate-500">Loading...</p>}
 
       {form && !loading && (
         <div className="mt-4 max-w-2xl space-y-5">
           <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            <p className="text-sm font-bold text-slate-900">Rider debt limits (₦)</p>
+            <p className="text-sm font-bold text-slate-900">Rider debt limits (&#8358;)</p>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <label className="text-xs font-semibold text-slate-500">
                 Alert at
@@ -146,6 +149,17 @@ export default function SettingsPage() {
           </section>
 
           <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <p className="text-sm font-bold text-slate-900">Company commission (%)</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Taken from every technician-company quotation. New quotes use the value at the time they are sent.
+            </p>
+            <label className="mt-2 block text-xs font-semibold text-slate-500">
+              Platform keeps (%)
+              <input type="number" min={0} max={50} value={form.company} onChange={set("company")} className={input} />
+            </label>
+          </section>
+
+          <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
             <p className="text-sm font-bold text-slate-900">Rider withdrawal days</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {DAYS.map((label, i) => (
@@ -171,7 +185,7 @@ export default function SettingsPage() {
             onClick={() => void save()}
             className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
-            {saving ? "Saving…" : "Save settings"}
+            {saving ? "Saving..." : "Save settings"}
           </button>
         </div>
       )}
