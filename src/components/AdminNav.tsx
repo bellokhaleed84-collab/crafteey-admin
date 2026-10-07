@@ -20,6 +20,8 @@ const TABS: NavItem[] = [
   { label: "Technician jobs", href: "/jobs", ready: true },
   { label: "Riders", href: "/riders", ready: true },
   { label: "Companies", href: "/companies", ready: true, permission: "companies.view" },
+  { label: "Chat reports", href: "/chat-reports", ready: true, permission: "chat.moderate" },
+  { label: "Blocked messages", href: "/blocked-messages", ready: true, permission: "chat.moderate" },
 ];
 
 // Lives behind the three-dot menu.
