@@ -3,7 +3,6 @@ import { requirePermission } from "@/middleware/adminAuth";
 import { connectToDatabase } from "@/lib/mongodb";
 import BlockedMessage from "@/models/BlockedMessage";
 import Company from "@/models/Company";
-import Client from "@/models/Client";
 import { apiError } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
@@ -79,33 +78,22 @@ export async function GET(req: NextRequest) {
     ]);
 
     const companyIds = [...new Set([...rows.map((r) => r.companyId), ...offenders.map((o) => o.companyId)])];
-    const clientUids = [
-      ...new Set([
-        ...rows.filter((r) => r.role === "client").map((r) => r.uid),
-        ...offenders.filter((o) => o._id.role === "client").map((o) => o._id.uid),
-      ]),
-    ];
     const companies = companyIds.length
       ? await Company.find({ _id: { $in: companyIds.filter((id) => /^[a-f0-9]{24}$/i.test(id)) } })
           .select("businessName")
           .lean()
       : [];
-    const clients = clientUids.length
-      ? await Client.find({ firebaseUid: { $in: clientUids } }).select("firebaseUid name").lean()
-      : [];
     const companyName = new Map(companies.map((c) => [String(c._id), c.businessName as string]));
-    const clientName = new Map(clients.map((c) => [c.firebaseUid as string, c.name as string]));
 
-    const who = (role: string, uid: string, companyId: string) =>
-      role === "company"
-        ? companyName.get(companyId) || "Company"
-        : clientName.get(uid) || "Customer";
+    // Customer names are not looked up yet (the admin app has no customer model).
+    const who = (role: string, companyId: string) =>
+      role === "company" ? companyName.get(companyId) || "Company" : "Customer";
 
     return NextResponse.json({
       blocked: rows.map((r) => ({
         _id: String(r._id),
         role: r.role,
-        sender: who(r.role, r.uid, r.companyId),
+        sender: who(r.role, r.companyId),
         companyName: companyName.get(r.companyId) || "",
         text: r.text,
         reason: r.reason,
@@ -115,7 +103,7 @@ export async function GET(req: NextRequest) {
       repeat: offenders.map((o) => ({
         key: `${o._id.role}:${o._id.uid}`,
         role: o._id.role,
-        sender: who(o._id.role, o._id.uid, o.companyId),
+        sender: who(o._id.role, o.companyId),
         count: o.n,
         last: o.last,
       })),

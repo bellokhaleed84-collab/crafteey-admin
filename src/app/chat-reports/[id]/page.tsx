@@ -17,6 +17,7 @@ type Report = {
   reviewedBy: string | null;
   reviewedAt: string | null;
   createdAt: string;
+  companyId: string;
   companyName: string;
   clientName: string;
 };
@@ -39,6 +40,10 @@ export default function ChatReportDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [warnReason, setWarnReason] = useState("");
+  const [warning, setWarning] = useState(false);
+  const [warnMsg, setWarnMsg] = useState("");
+  const [warnError, setWarnError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,6 +91,30 @@ export default function ChatReportDetailPage() {
     }
   }
 
+  async function warnCompany() {
+    if (!data || warning) return;
+    if (!window.confirm("Send an official warning to this company? It is recorded on the company and in the audit log.")) return;
+    setWarning(true);
+    setWarnError("");
+    setWarnMsg("");
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/admin/companies/${data.report.companyId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "warn", reason: warnReason, reportId: data.report._id }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.error || "Could not record the warning");
+      setWarnMsg(`Warning recorded. This company now has ${d.warningCount} warning(s).`);
+      setWarnReason("");
+    } catch (e) {
+      setWarnError(e instanceof Error ? e.message : "Could not record the warning");
+    } finally {
+      setWarning(false);
+    }
+  }
+
   const r = data?.report;
 
   return (
@@ -95,7 +124,12 @@ export default function ChatReportDetailPage() {
       </Link>
 
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {loading && <p className="mt-4 text-sm text-slate-500">Loading...</p>}
+      {loading && (
+        <div className="mt-4 animate-pulse space-y-3" aria-busy="true">
+          <div className="h-24 rounded-2xl bg-slate-100" />
+          <div className="h-48 rounded-2xl bg-slate-100" />
+        </div>
+      )}
 
       {r && data && (
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -147,6 +181,36 @@ export default function ChatReportDetailPage() {
                     Reopen
                   </button>
                 )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <p className="text-sm font-bold text-slate-900">Warn this company</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Records a warning on the company. To suspend, use the Companies page (needs the review permission).
+              </p>
+              <textarea
+                rows={2}
+                maxLength={300}
+                value={warnReason}
+                onChange={(e) => setWarnReason(e.target.value)}
+                placeholder="Reason for the warning"
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+              />
+              {warnMsg && <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-700">{warnMsg}</p>}
+              {warnError && <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{warnError}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={warning || warnReason.trim().length < 5}
+                  onClick={() => void warnCompany()}
+                  className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                >
+                  {warning ? "Saving..." : "Warn company"}
+                </button>
+                <Link href="/companies?tab=approved" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">
+                  Open Companies
+                </Link>
               </div>
             </section>
 

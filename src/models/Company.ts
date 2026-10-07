@@ -3,6 +3,14 @@ import { Schema, models, model, type Model } from "mongoose";
 export type CompanyStatus = "pending" | "approved" | "rejected" | "suspended";
 export type CompanyPriceRange = "low" | "mid" | "high";
 
+export interface ICompanyWarning {
+  reason: string;
+  issuedByUid: string;
+  issuedByName?: string;
+  issuedAt: Date;
+  reportId?: string;
+}
+
 export interface ICompany {
   uid: string; // Firebase uid of the owner
   businessName: string;
@@ -35,6 +43,7 @@ export interface ICompany {
   status: CompanyStatus;
   isApproved: boolean; // always follows status
   statusReason?: string; // why it was rejected or suspended
+  warnings?: ICompanyWarning[];
   verified: boolean; // verified badge
   isOnline: boolean;
   rating: number;
@@ -79,6 +88,21 @@ const CompanySchema = new Schema<ICompany>(
     },
     isApproved: { type: Boolean, default: false },
     statusReason: { type: String },
+    warnings: {
+      type: [
+        new Schema(
+          {
+            reason: { type: String, required: true, maxlength: 300 },
+            issuedByUid: { type: String, required: true },
+            issuedByName: { type: String },
+            issuedAt: { type: Date, required: true },
+            reportId: { type: String },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     verified: { type: Boolean, default: false },
     isOnline: { type: Boolean, default: false },
     rating: { type: Number, default: 0 },

@@ -34,25 +34,28 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 /**
  * PATCH /api/admin/companies/[id]
- * body: { action: "record_agreement" | "approve" | "reject" | "suspend", ... }
+ * body: { action: "record_agreement" | "approve" | "reject" | "suspend" | "warn", ... }
  *  - record_agreement: { version, signedAt?, notes? }. Saves that the owner
  *    signed the agreement at the office.
  *  - approve: only works once the agreement is recorded. Also reinstates a
  *    rejected or suspended company.
  *  - reject / suspend: { reason } (at least 5 characters).
+ *  - warn: { reason, reportId? }. Needs chat.moderate (Support can do it).
+ *    The other actions need companies.review.
  * status is the source of truth; isApproved always follows it.
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const admin = await requirePermission(req, "companies.review");
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action;
+    if (!["record_agreement", "approve", "reject", "suspend", "warn"].includes(action)) {
+      return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    }
+
+    const admin = await requirePermission(req, action === "warn" ? "chat.moderate" : "companies.review");
     if (admin instanceof NextResponse) return admin;
     if (!mongoose.isValidObjectId(params.id)) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-    const body = await req.json().catch(() => ({}));
-    const action = body?.action;
-    if (!["record_agreement", "approve", "reject", "suspend"].includes(action)) {
-      return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
     await connectToDatabase();
 
@@ -64,6 +67,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       isApproved: company.isApproved,
       agreement: company.agreement,
     };
+
+    if (action === "warn") {
+      const reason = String(body.reason ?? "").trim().slice(0, 300);
+      if (reason.length < 5) {
+        return NextResponse.json({ error: "Enter a reason (at least 5 characters)." }, { status: 400 });
+      }
+      const reportId = mongoose.isValidObjectId(body.reportId) ? String(body.reportId) : undefined;
+      const warning = {
+        reason,
+        issuedByUid: admin.uid,
+        issuedByName: admin.name,
+        issuedAt: new Date(),
+        ...(reportId ? { reportId } : {}),
+      };
+      await Company.updateOne({ _id: params.id }, { $push: { warnings: warning } });
+      const warningCount = (company.warnings?.length ?? 0) + 1;
+
+      await logAudit(admin, {
+        action: "company.warn",
+        targetType: "Company",
+        targetId: params.id,
+        summary: `Warned company ${company.businessName} (warning ${warningCount}): ${reason}`,
+        after: { warning, warningCount },
+      });
+      return NextResponse.json({ ok: true, warningCount });
+    }
 
     if (action === "record_agreement") {
       const version = String(body.version ?? "").trim();
