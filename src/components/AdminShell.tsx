@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,8 @@ import {
   Banknote,
   LifeBuoy,
   Star,
+  Flag,
+  ShieldAlert,
   FileText,
   Settings,
   Users,
@@ -75,6 +77,8 @@ const GROUPS: NavGroup[] = [
     label: "Support",
     items: [
       { label: "Support & Complaints", href: "/support", icon: LifeBuoy, permission: "support.view", ready: false },
+      { label: "Chat reports", href: "/chat-reports", icon: Flag, permission: "chat.moderate", ready: true },
+      { label: "Blocked messages", href: "/blocked-messages", icon: ShieldAlert, permission: "chat.moderate", ready: true },
       { label: "Reviews", href: "/reviews", icon: Star, permission: "reviews.manage", ready: false },
     ],
   },

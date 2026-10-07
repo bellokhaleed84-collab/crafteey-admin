@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from "mongoose";
 
-export const REPORT_REASONS = ["contact_outside", "abusive", "scam", "unsafe", "other"] as const;
+export const REPORT_REASONS = ["contact_outside", "abusive", "scam", "unsafe", "fake_request", "other"] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
 export const REPORT_STATUSES = ["open", "reviewed", "action_taken", "dismissed"] as const;

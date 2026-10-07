@@ -3,6 +3,7 @@ export const REPORT_REASON_LABELS: Record<string, string> = {
   abusive: "Rude or abusive",
   scam: "Looks like a scam",
   unsafe: "Feels unsafe",
+  fake_request: "Fake or time-wasting request",
   other: "Something else",
 };
 
