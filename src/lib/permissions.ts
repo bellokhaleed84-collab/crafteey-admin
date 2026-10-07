@@ -23,7 +23,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   super_admin: "Full access, including staff management and the audit log.",
-  operations: "Live orders, client requests, technician jobs, and viewing riders, vendors and companies.",
+  operations: "Live orders, client requests, technician jobs, home banners, and viewing riders, vendors and companies.",
   onboarding: "Reviews technician, rider, vendor and company applications.",
   rider_management: "Reviews and manages riders.",
   finance: "Wallets, payouts, reports and other money views.",
@@ -57,6 +57,7 @@ export const PERMISSIONS = [
   "support.view",
   "support.manage",
   "reviews.manage",
+  "banners.manage",
   "reports.view",
   "settings.manage",
   "staff.manage",
@@ -79,6 +80,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
     "orders.view",
     "orders.manage",
     "customers.view",
+    "banners.manage",
   ],
   onboarding: [
     "dashboard.view",

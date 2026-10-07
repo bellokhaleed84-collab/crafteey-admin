@@ -23,6 +23,7 @@ import {
   Settings,
   Users,
   ScrollText,
+  Megaphone,
   LogOut,
   Menu,
   X,
@@ -53,6 +54,7 @@ const GROUPS: NavGroup[] = [
       { label: "Orders", href: "/orders", icon: ShoppingBag, permission: "orders.view", ready: true },
       { label: "Client requests", href: "/requests", icon: ClipboardList, permission: "requests.view", ready: true },
       { label: "Technician jobs", href: "/jobs", icon: Briefcase, permission: "jobs.view", ready: true },
+      { label: "Banners", href: "/banners", icon: Megaphone, permission: "banners.manage", ready: true },
     ],
   },
   {
@@ -184,7 +186,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (isPublicRoute) return <>{children}</>;
 
   if (loading) return <ShellSkeleton />;
-  if (!user || access === "signed_out") return <FullScreenMessage>Redirecting to sign in…</FullScreenMessage>;
+  if (!user || access === "signed_out") return <FullScreenMessage>Redirecting to sign in...</FullScreenMessage>;
   if (access === "loading") return <ShellSkeleton />;
   if (access === "needs_verification") return <VerifyEmailScreen />;
 
