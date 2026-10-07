@@ -9,39 +9,51 @@ export const BANNER_THEME_LABELS: Record<BannerTheme, string> = {
   orange: "Orange",
 };
 
-export const BANNER_THEME_CLASSES: Record<
+// Colours are applied directly (inline) so they always show,
+// whatever Tailwind does or does not scan.
+export const BANNER_THEME_STYLES: Record<
   BannerTheme,
-  { box: string; title: string; sub: string; button: string }
+  { bg: string; border: string; title: string; sub: string; buttonBg: string; buttonText: string }
 > = {
   navy: {
-    box: "bg-[#0B1530]",
-    title: "text-white",
-    sub: "text-white/75",
-    button: "bg-[#F5C542] text-[#0B1530]",
+    bg: "#0B1530",
+    border: "transparent",
+    title: "#FFFFFF",
+    sub: "rgba(255,255,255,0.8)",
+    buttonBg: "#F5C542",
+    buttonText: "#0B1530",
   },
   yellow: {
-    box: "bg-[#F5C542]",
-    title: "text-[#0B1530]",
-    sub: "text-[#0B1530]/70",
-    button: "bg-[#0B1530] text-white",
+    bg: "#F5C542",
+    border: "transparent",
+    title: "#0B1530",
+    sub: "rgba(11,21,48,0.75)",
+    buttonBg: "#0B1530",
+    buttonText: "#FFFFFF",
   },
   white: {
-    box: "bg-white border border-slate-200",
-    title: "text-[#0B1530]",
-    sub: "text-slate-500",
-    button: "bg-[#0B1530] text-white",
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    title: "#0B1530",
+    sub: "#64748B",
+    buttonBg: "#0B1530",
+    buttonText: "#FFFFFF",
   },
   purple: {
-    box: "bg-[#5B2EBF]",
-    title: "text-white",
-    sub: "text-white/80",
-    button: "bg-white text-[#5B2EBF]",
+    bg: "#5B2EBF",
+    border: "transparent",
+    title: "#FFFFFF",
+    sub: "rgba(255,255,255,0.85)",
+    buttonBg: "#FFFFFF",
+    buttonText: "#5B2EBF",
   },
   orange: {
-    box: "bg-[#F97316]",
-    title: "text-white",
-    sub: "text-white/85",
-    button: "bg-white text-[#C2410C]",
+    bg: "#F97316",
+    border: "transparent",
+    title: "#FFFFFF",
+    sub: "rgba(255,255,255,0.9)",
+    buttonBg: "#FFFFFF",
+    buttonText: "#C2410C",
   },
 };
 

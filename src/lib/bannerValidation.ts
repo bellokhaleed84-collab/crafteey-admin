@@ -8,12 +8,15 @@ export interface BannerInput {
   art: string;
   emoji: string;
   theme: string;
+  placement: string;
   enabled: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
 }
 
 type ParseResult = { ok: true; data: BannerInput } | { ok: false; error: string };
+
+const PLACEMENTS = ["home", "hub", "both"];
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -43,6 +46,9 @@ export function parseBannerBody(body: Record<string, unknown>): ParseResult {
   const theme = typeof body.theme === "string" ? body.theme : "navy";
   if (!isBannerTheme(theme)) return { ok: false, error: "Pick a valid colour theme." };
 
+  const placement = typeof body.placement === "string" ? body.placement : "home";
+  if (!PLACEMENTS.includes(placement)) return { ok: false, error: "Pick where the banner shows: Home, Hub or Both." };
+
   const startsAt = parseDate(body.startsAt);
   const endsAt = parseDate(body.endsAt);
   if (startsAt === "invalid" || endsAt === "invalid") return { ok: false, error: "A date is not valid." };
@@ -60,6 +66,7 @@ export function parseBannerBody(body: Record<string, unknown>): ParseResult {
       art,
       emoji: str(body.emoji, 8),
       theme,
+      placement,
       enabled: body.enabled !== false,
       startsAt,
       endsAt,
@@ -76,6 +83,7 @@ type BannerLike = {
   art?: string;
   emoji?: string;
   theme?: string;
+  placement?: string;
   order?: number;
   enabled?: boolean;
   startsAt?: Date | null;
@@ -92,6 +100,7 @@ export function serializeBanner(b: BannerLike) {
     art: b.art ?? "",
     emoji: b.emoji ?? "",
     theme: b.theme ?? "navy",
+    placement: b.placement ?? "home",
     order: b.order ?? 0,
     enabled: b.enabled !== false,
     startsAt: b.startsAt ? new Date(b.startsAt).toISOString() : null,

@@ -9,6 +9,7 @@ export interface IBanner {
   art: string;
   emoji: string;
   theme: string;
+  placement: string;
   order: number;
   enabled: boolean;
   startsAt?: Date | null;
@@ -26,6 +27,7 @@ const BannerSchema = new Schema<IBanner>(
     art: { type: String, default: "", maxlength: 500 },
     emoji: { type: String, default: "", maxlength: 8 },
     theme: { type: String, enum: BANNER_THEMES, default: "navy" },
+    placement: { type: String, enum: ["home", "hub", "both"], default: "home" },
     order: { type: Number, default: 0 },
     enabled: { type: Boolean, default: true },
     startsAt: { type: Date, default: null },
