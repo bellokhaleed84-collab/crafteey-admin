@@ -16,7 +16,7 @@ export interface BannerInput {
 
 type ParseResult = { ok: true; data: BannerInput } | { ok: false; error: string };
 
-const PLACEMENTS = ["home", "hub", "both"];
+const PLACEMENTS = ["home", "hub", "both", "rides"];
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -47,7 +47,7 @@ export function parseBannerBody(body: Record<string, unknown>): ParseResult {
   if (!isBannerTheme(theme)) return { ok: false, error: "Pick a valid colour theme." };
 
   const placement = typeof body.placement === "string" ? body.placement : "home";
-  if (!PLACEMENTS.includes(placement)) return { ok: false, error: "Pick where the banner shows: Home, Hub or Both." };
+  if (!PLACEMENTS.includes(placement)) return { ok: false, error: "Pick where the banner shows: Home, Hub, Home + Hub or Rides." };
 
   const startsAt = parseDate(body.startsAt);
   const endsAt = parseDate(body.endsAt);

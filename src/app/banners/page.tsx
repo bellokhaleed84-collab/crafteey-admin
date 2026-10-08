@@ -66,6 +66,7 @@ const PLACEMENTS = [
   { value: "home", label: "Home" },
   { value: "hub", label: "Hub" },
   { value: "both", label: "Home + Hub" },
+  { value: "rides", label: "Rides" },
 ];
 
 const INPUT = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900";
@@ -357,7 +358,7 @@ export default function BannersPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Banners</h1>
           <p className="mt-1 text-sm text-slate-500">
-            The swiping banners in the client app, on Home and on the Hub page. They show in the order below.
+            The swiping banners in the client app, on Home, the Hub page and the Rides page. They show in the order below.
           </p>
         </div>
         {!form && (
