@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { dateTime } from "@/lib/format";
 
+type Which = "terms" | "rider-terms";
+
 type Loaded = {
   body: string;
   defaultBody: string;
@@ -13,8 +15,14 @@ type Loaded = {
   updatedAt: string | null;
 };
 
+const TABS: { id: Which; label: string; where: string }[] = [
+  { id: "terms", label: "Customer terms", where: "the client app, under More, Terms & Conditions" },
+  { id: "rider-terms", label: "Rider terms", where: "the rider app, under Settings, Terms & conditions" },
+];
+
 export default function TermsEditorPage() {
   const { getIdToken } = useAdminAuth();
+  const [which, setWhich] = useState<Which>("terms");
   const [data, setData] = useState<Loaded | null>(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -22,39 +30,53 @@ export default function TermsEditorPage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = await getIdToken();
-      const res = await fetch("/api/admin/legal/terms", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d?.error || "Something went wrong");
-      setData(d);
-      setText(d.body);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the terms");
-    } finally {
-      setLoading(false);
-    }
-  }, [getIdToken]);
+  const load = useCallback(
+    async (w: Which) => {
+      setLoading(true);
+      setError("");
+      try {
+        const token = await getIdToken();
+        const res = await fetch(`/api/admin/legal/${w}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d?.error || "Something went wrong");
+        setData(d);
+        setText(d.body);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load the terms");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getIdToken]
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(which);
+  }, [load, which]);
+
+  const dirty = !!data && text !== data.body;
+  const tab = TABS.find((t) => t.id === which)!;
+
+  function switchTab(id: Which) {
+    if (id === which) return;
+    if (dirty && !window.confirm("You have unsaved changes. Switch anyway?")) return;
+    setData(null);
+    setSaved(false);
+    setWhich(id);
+  }
 
   async function save() {
     if (!data || saving) return;
-    if (!window.confirm("Save these terms? Customers will see the new text straight away.")) return;
+    if (!window.confirm("Save these terms? People will see the new text straight away.")) return;
     setSaving(true);
     setError("");
     setSaved(false);
     try {
       const token = await getIdToken();
-      const res = await fetch("/api/admin/legal/terms", {
+      const res = await fetch(`/api/admin/legal/${which}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ body: text, expectedVersion: data.version }),
@@ -62,7 +84,7 @@ export default function TermsEditorPage() {
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d?.error || "Could not save");
       setSaved(true);
-      await load();
+      await load(which);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
     } finally {
@@ -70,14 +92,25 @@ export default function TermsEditorPage() {
     }
   }
 
-  const dirty = !!data && text !== data.body;
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900">Terms & Conditions</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        This is what customers read under More, Terms & Conditions. Edit it here and save.
-      </p>
+      <p className="mt-1 text-sm text-slate-500">This is what people read in {tab.where}. Edit it here and save.</p>
+
+      <div className="mt-4 flex gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => switchTab(t.id)}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+              which === t.id ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {loading && <div className="mt-4 h-96 animate-pulse rounded-2xl bg-slate-100" aria-busy="true" />}
@@ -87,8 +120,8 @@ export default function TermsEditorPage() {
           <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-2">
             {data.isDefault && (
               <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                This is the starter text and it has not been saved yet. Customers already see it. Replace it with the
-                terms from your lawyer when you have them.
+                This is the starter text and it has not been saved yet. People already see it. Replace it with the terms
+                from your lawyer when you have them.
               </p>
             )}
             <textarea
@@ -102,7 +135,7 @@ export default function TermsEditorPage() {
               spellCheck
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
             />
-            {saved && <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-700">Saved. Customers now see this version.</p>}
+            {saved && <p className="mt-2 rounded-lg bg-green-50 p-2 text-xs text-green-700">Saved. People now see this version.</p>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"

@@ -89,6 +89,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "Platform Settings", href: "/settings", icon: Settings, permission: "settings.manage", ready: true },
       { label: "Terms & Conditions", href: "/legal", icon: FileText, permission: "settings.manage", ready: true },
+      { label: "Rider Home cards", href: "/home-cards", icon: Megaphone, permission: "settings.manage", ready: true },
+      { label: "Rider Settings sections", href: "/rider-sections", icon: Bike, permission: "settings.manage", ready: true },
       { label: "Staff Management", href: "/staff", icon: Users, permission: "staff.manage", ready: true },
       { label: "Audit Log", href: "/audit", icon: ScrollText, permission: "audit.view", ready: true },
     ],
