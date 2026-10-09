@@ -19,7 +19,7 @@ export interface IRiderHomeCard {
 const RiderHomeCardSchema = new Schema<IRiderHomeCard>(
   {
     title: { type: String, required: true, maxlength: 40 },
-    message: { type: String, default: "", maxlength: 300 },
+    message: { type: String, default: "", maxlength: 1200 },
     icon: { type: String, enum: CARD_ICONS, default: "info" },
     color: { type: String, enum: CARD_COLORS, default: "orange" },
     order: { type: Number, default: 0 },

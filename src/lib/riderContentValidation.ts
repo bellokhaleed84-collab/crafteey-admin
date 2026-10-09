@@ -36,7 +36,7 @@ export function parseCardBody(body: Record<string, unknown>): CardResult {
   const title = str(body.title, 40);
   if (!title) return { ok: false, error: "Give the card a title." };
 
-  const message = typeof body.message === "string" ? body.message.replace(/\r\n/g, "\n").trim().slice(0, 300) : "";
+  const message = typeof body.message === "string" ? body.message.replace(/\r\n/g, "\n").trim().slice(0, 1200) : "";
 
   const icon = typeof body.icon === "string" ? body.icon : "info";
   if (!(CARD_ICONS as readonly string[]).includes(icon)) return { ok: false, error: "Pick a valid icon." };

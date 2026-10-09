@@ -290,11 +290,11 @@ export default function HomeCardsPage() {
               <input className={`${INPUT} mt-1`} maxLength={40} value={form.title} onChange={(e) => set("title", e.target.value)} />
             </label>
             <label className="block text-xs font-semibold text-slate-600 sm:col-span-2">
-              Message (max 300)
+              Message (max 1200, one item per line)
               <textarea
                 className={`${INPUT} mt-1`}
-                rows={3}
-                maxLength={300}
+                rows={8}
+                maxLength={1200}
                 value={form.message}
                 onChange={(e) => set("message", e.target.value)}
               />
