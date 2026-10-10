@@ -23,6 +23,18 @@ type Row = {
 const TABS = ["published", "hidden", "all"] as const;
 const TAB_LABEL: Record<string, string> = { published: "Published", hidden: "Hidden", all: "All" };
 
+const TARGETS = [
+  { value: "", label: "Everyone" },
+  { value: "company", label: "Companies" },
+  { value: "rider", label: "Riders" },
+];
+const TARGET_LABEL: Record<string, string> = { company: "Company", rider: "Rider", vendor: "Vendor" };
+const TARGET_STYLE: Record<string, string> = {
+  company: "bg-blue-50 text-blue-700",
+  rider: "bg-purple-50 text-purple-700",
+  vendor: "bg-amber-50 text-amber-700",
+};
+
 function Stars({ value }: { value: number }) {
   return (
     <span className="flex gap-0.5" aria-label={`${value} out of 5 stars`}>
@@ -50,6 +62,7 @@ function RowSkeletons() {
 export default function ReviewsPage() {
   const { getIdToken } = useAdminAuth();
   const [tab, setTab] = useState<(typeof TABS)[number]>("published");
+  const [target, setTarget] = useState("");
   const [rating, setRating] = useState("");
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
@@ -73,7 +86,7 @@ export default function ReviewsPage() {
     try {
       const token = await getIdToken();
       const res = await fetch(
-        `/api/admin/reviews?status=${tab}&rating=${rating}&page=${page}&q=${encodeURIComponent(search)}`,
+        `/api/admin/reviews?status=${tab}&target=${target}&rating=${rating}&page=${page}&q=${encodeURIComponent(search)}`,
         { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
       );
       const d = await res.json().catch(() => ({}));
@@ -87,7 +100,7 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [getIdToken, tab, rating, page, search]);
+  }, [getIdToken, tab, target, rating, page, search]);
 
   useEffect(() => {
     void load();
@@ -130,10 +143,30 @@ export default function ReviewsPage() {
     <div>
       <h1 className="text-2xl font-bold text-slate-900">Reviews</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Customer reviews of companies. Hidden reviews disappear from the app and no longer count toward the rating.
+        Customer reviews of companies and riders. Hidden reviews disappear from the apps and no longer count toward the
+        rating.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {TARGETS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => {
+              setTarget(t.value);
+              setPage(1);
+              setHidingId(null);
+            }}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+              target === t.value ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t}
@@ -175,7 +208,7 @@ export default function ReviewsPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && doSearch()}
-          placeholder="Search company or customer name"
+          placeholder="Search company, rider or customer name"
           className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
         />
         <button type="button" onClick={doSearch} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
@@ -201,6 +234,13 @@ export default function ReviewsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                            TARGET_STYLE[r.targetType] || "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {TARGET_LABEL[r.targetType] || r.targetType}
+                        </span>
                         <p className="text-sm font-bold text-slate-900">{r.targetName}</p>
                         <Stars value={r.rating} />
                         {r.status === "hidden" && (
@@ -210,7 +250,7 @@ export default function ReviewsPage() {
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        by {r.reviewerName} · {dateTime(r.createdAt)}
+                        by {r.reviewerName} - {dateTime(r.createdAt)}
                       </p>
                       {r.comment ? (
                         <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">{r.comment}</p>
@@ -298,7 +338,7 @@ export default function ReviewsPage() {
             Previous
           </button>
           <span className="text-slate-500">
-            Page {page} of {pages} · {total} total
+            Page {page} of {pages} - {total} total
           </span>
           <button
             type="button"

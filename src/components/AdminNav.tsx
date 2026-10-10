@@ -19,6 +19,7 @@ const TABS: NavItem[] = [
   { label: "Client requests", href: "/requests", ready: true },
   { label: "Technician jobs", href: "/jobs", ready: true },
   { label: "Riders", href: "/riders", ready: true },
+  { label: "Safety alerts", href: "/safety-alerts", ready: true, permission: "riders.view" },
   { label: "Companies", href: "/companies", ready: true, permission: "companies.view" },
   { label: "Chat reports", href: "/chat-reports", ready: true, permission: "chat.moderate" },
   { label: "Blocked messages", href: "/blocked-messages", ready: true, permission: "chat.moderate" },
