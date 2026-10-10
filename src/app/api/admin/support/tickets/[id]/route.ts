@@ -13,6 +13,7 @@ type Ctx = { params: { id: string } };
 type MsgRow = { _id: unknown; senderRole: string; senderName?: string; text: string; createdAt: Date };
 type TicketDoc = {
   _id: unknown;
+  userType?: string;
   clientName?: string;
   clientEmail?: string;
   clientPhone?: string;
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({
       ticket: {
         id: String(t._id),
+        userType: t.userType === "rider" ? "rider" : "client",
         clientName: t.clientName ?? "",
         clientEmail: t.clientEmail ?? "",
         clientPhone: t.clientPhone ?? "",

@@ -10,6 +10,7 @@ import { CATEGORY_LABELS, STATUS_LABELS, STATUS_STYLE } from "@/lib/supportLabel
 type Msg = { id: string; senderRole: "client" | "admin"; senderName: string; text: string; createdAt: string };
 type Ticket = {
   id: string;
+  userType: string;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -106,9 +107,10 @@ export default function SupportTicketPage() {
 
   async function setStatus(status: "in_progress" | "fixed") {
     if (busy) return;
+    const who = ticket?.userType === "rider" ? "rider" : "customer";
     if (
       status === "fixed" &&
-      !window.confirm("Mark this problem as fixed? The chat closes right away and the customer can no longer reply.")
+      !window.confirm(`Mark this problem as fixed? The chat closes right away and the ${who} can no longer reply.`)
     ) {
       return;
     }
@@ -132,6 +134,8 @@ export default function SupportTicketPage() {
   }
 
   const fixed = ticket?.status === "fixed";
+  const isRider = ticket?.userType === "rider";
+  const whoLabel = isRider ? "Rider" : "Customer";
 
   return (
     <div>
@@ -156,7 +160,7 @@ export default function SupportTicketPage() {
               <p className="mt-1 text-sm text-slate-700">{ticket.subject}</p>
               <dl className="mt-3 space-y-1 text-xs text-slate-500">
                 <div>
-                  Customer: <span className="font-semibold text-slate-700">{ticket.clientName || "Unknown"}</span>
+                  {whoLabel}: <span className="font-semibold text-slate-700">{ticket.clientName || "Unknown"}</span>
                 </div>
                 {ticket.clientEmail && (
                   <div>
@@ -165,7 +169,10 @@ export default function SupportTicketPage() {
                 )}
                 {ticket.clientPhone && (
                   <div>
-                    Phone: <span className="font-semibold text-slate-700">{ticket.clientPhone}</span>
+                    Phone:{" "}
+                    <a href={`tel:${ticket.clientPhone}`} className="font-semibold text-blue-600">
+                      {ticket.clientPhone}
+                    </a>
                   </div>
                 )}
                 <div>Sent {dateTime(ticket.createdAt)}</div>
@@ -229,7 +236,7 @@ export default function SupportTicketPage() {
                       }`}
                     >
                       <p className="text-[10px] font-semibold uppercase opacity-60">
-                        {mine ? m.senderName || "Support" : ticket.clientName || "Customer"} - {dateTime(m.createdAt)}
+                        {mine ? m.senderName || "Support" : ticket.clientName || whoLabel} - {dateTime(m.createdAt)}
                       </p>
                       <p className="mt-0.5 whitespace-pre-wrap break-words">{m.text}</p>
                     </div>
@@ -250,7 +257,7 @@ export default function SupportTicketPage() {
                   maxLength={1000}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Write a reply to the customer"
+                  placeholder={`Write a reply to the ${whoLabel.toLowerCase()}`}
                   className="min-h-12 flex-1 resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                 />
                 <button

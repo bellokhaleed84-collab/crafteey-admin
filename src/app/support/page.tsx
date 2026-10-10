@@ -8,6 +8,7 @@ import { CATEGORY_LABELS, STATUS_LABELS, STATUS_STYLE } from "@/lib/supportLabel
 
 type Row = {
   id: string;
+  userType: string;
   clientName: string;
   category: string;
   subject: string;
@@ -18,10 +19,30 @@ type Row = {
 };
 
 const TABS = ["open", "in_progress", "fixed", "all"] as const;
+const WHO = [
+  { value: "", label: "Everyone" },
+  { value: "client", label: "Customers" },
+  { value: "rider", label: "Riders" },
+];
+
+function RowSkeletons() {
+  return (
+    <div className="space-y-3 p-4" aria-busy="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="animate-pulse space-y-2 rounded-xl border border-slate-100 p-4">
+          <div className="h-4 w-1/3 rounded bg-slate-200" />
+          <div className="h-3 w-1/2 rounded bg-slate-100" />
+          <div className="h-3 w-3/4 rounded bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function SupportListPage() {
   const { getIdToken } = useAdminAuth();
   const [tab, setTab] = useState<(typeof TABS)[number]>("open");
+  const [who, setWho] = useState("");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -35,7 +56,7 @@ export default function SupportListPage() {
     setError("");
     try {
       const token = await getIdToken();
-      const res = await fetch(`/api/admin/support/tickets?status=${tab}&page=${page}`, {
+      const res = await fetch(`/api/admin/support/tickets?status=${tab}&who=${who}&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
@@ -50,7 +71,7 @@ export default function SupportListPage() {
     } finally {
       setLoading(false);
     }
-  }, [getIdToken, tab, page]);
+  }, [getIdToken, tab, who, page]);
 
   useEffect(() => {
     void load();
@@ -59,9 +80,29 @@ export default function SupportListPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900">Support</h1>
-      <p className="mt-1 text-sm text-slate-500">Problems customers reported from the app. Reply in the chat, then mark it fixed.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        Problems customers and riders reported from the apps. Reply in the chat, then mark it fixed.
+      </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {WHO.map((w) => (
+          <button
+            key={w.value}
+            type="button"
+            onClick={() => {
+              setWho(w.value);
+              setPage(1);
+            }}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+              who === w.value ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-600"
+            }`}
+          >
+            {w.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t}
@@ -84,7 +125,7 @@ export default function SupportListPage() {
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         {loading ? (
-          <p className="p-6 text-sm text-slate-500">Loading...</p>
+          <RowSkeletons />
         ) : rows.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No reports here.</p>
         ) : (
@@ -93,7 +134,14 @@ export default function SupportListPage() {
               <li key={r.id}>
                 <Link href={`/support/${r.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-slate-50">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-slate-900">
+                    <p className="flex flex-wrap items-center gap-2 truncate text-sm font-bold text-slate-900">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          r.userType === "rider" ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700"
+                        }`}
+                      >
+                        {r.userType === "rider" ? "Rider" : "Customer"}
+                      </span>
                       {r.clientName} - {CATEGORY_LABELS[r.category] || r.category}
                     </p>
                     <p className="truncate text-xs text-slate-600">{r.subject}</p>

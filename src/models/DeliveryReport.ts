@@ -2,7 +2,7 @@ import mongoose, { Schema, type Model } from "mongoose";
 
 // Same collection as the rider app's DeliveryReport ("deliveryreports").
 // Riders write to it; admin reads it and marks reports fixed.
-export const REPORT_KINDS = ["problem", "emergency", "gave_up"] as const;
+export const REPORT_KINDS = ["problem", "emergency", "gave_up", "locked"] as const;
 
 export interface IDeliveryReport {
   kind: (typeof REPORT_KINDS)[number];

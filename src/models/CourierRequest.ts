@@ -1,8 +1,9 @@
 import mongoose, { Schema, type Model } from "mongoose";
 
-// Read-only copy of the delivery request shared by crafteey-client and crafteey-rider.
+// Copy of the delivery request shared by crafteey-client and crafteey-rider.
 // Its status is the DELIVERY status, not the rider account status in constants.ts.
-// pickupCode is left out on purpose so it can never reach an admin screen.
+// pickupCode and deliveryCode are left out on purpose so they can never reach an admin screen.
+// deliveryCodeAttempts is here only so admin can unlock a locked delivery.
 export interface ICourierRequest {
   clientName: string;
   clientPhone: string;
@@ -18,6 +19,7 @@ export interface ICourierRequest {
   courierUid: string | null;
   courierName: string | null;
   courierPhone: string | null;
+  deliveryCodeAttempts?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +40,7 @@ const CourierRequestSchema = new Schema<ICourierRequest>(
     courierUid: String,
     courierName: String,
     courierPhone: String,
+    deliveryCodeAttempts: Number,
   },
   { timestamps: true, autoIndex: false }
 );
