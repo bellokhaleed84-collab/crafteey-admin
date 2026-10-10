@@ -10,6 +10,8 @@ export interface ICourier extends Document {
   idNumber: string;
   idPhotoUrl: string;
   status: CourierStatus;
+  rejectionReason?: string;
+  resubmittedAt?: Date | null;
   isOnline: boolean;
   currentLocation: { lat: number; lng: number } | null;
   createdAt: Date;
@@ -33,6 +35,10 @@ const CourierSchema = new Schema<ICourier>(
       enum: Object.values(COURIER_STATUS),
       default: COURIER_STATUS.PENDING,
     },
+    // Why the application was rejected (the rider sees this), and when the
+    // rider last sent a new document after a rejection.
+    rejectionReason: { type: String, default: "" },
+    resubmittedAt: { type: Date, default: null },
     isOnline: { type: Boolean, default: false },
     currentLocation: {
       type: new Schema({ lat: Number, lng: Number }, { _id: false }),

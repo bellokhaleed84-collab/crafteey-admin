@@ -15,6 +15,8 @@ type Courier = {
   idNumber?: string;
   idPhotoUrl?: string;
   status: CourierStatus;
+  rejectionReason?: string;
+  resubmittedAt?: string | null;
   isOnline?: boolean;
   createdAt: string;
 };
@@ -35,6 +37,28 @@ const EMPTY_TEXT: Record<string, string> = {
   blacklisted: "No blacklisted riders.",
 };
 
+// Quick reasons the admin can tap to fill the box, then edit.
+const REASON_CHIPS = [
+  "The document photo is blurry or cut off.",
+  "The document is not valid or has expired.",
+  "The name on the document does not match your profile.",
+  "Please use a NIN, Driver's Licence or Voter's Card.",
+];
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="animate-pulse rounded-xl border border-slate-100 bg-white p-4">
+          <div className="h-4 w-1/3 rounded bg-slate-200" />
+          <div className="mt-3 h-3 w-1/2 rounded bg-slate-100" />
+          <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RidersPage() {
   const { getIdToken, can } = useAdminAuth();
   const [tab, setTab] = useState<CourierStatus>(COURIER_STATUS.PENDING);
@@ -43,6 +67,8 @@ export default function RidersPage() {
   const [listLoading, setListLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  const [rejectUid, setRejectUid] = useState<string | null>(null);
+  const [reasonText, setReasonText] = useState("");
 
   const canReview = can("riders.review");
   const canManage = can("riders.manage");
@@ -75,8 +101,13 @@ export default function RidersPage() {
     load();
   }, [load]);
 
-  async function setStatus(rider: Courier, status: CourierStatus, confirmText?: string) {
-    if (confirmText && !confirm(confirmText)) return;
+  async function setStatus(
+    rider: Courier,
+    status: CourierStatus,
+    confirmText?: string,
+    reason?: string
+  ): Promise<boolean> {
+    if (confirmText && !confirm(confirmText)) return false;
     setError("");
     setBusyUid(rider.firebaseUid);
     try {
@@ -85,15 +116,36 @@ export default function RidersPage() {
       const res = await fetch(`/api/admin/couriers/${rider.firebaseUid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(reason ? { status, rejectionReason: reason } : { status }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Couldn't update this rider.");
       await load();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't update this rider.");
+      return false;
     } finally {
       setBusyUid(null);
+    }
+  }
+
+  function openReject(r: Courier) {
+    setError("");
+    setReasonText("");
+    setRejectUid(rejectUid === r.firebaseUid ? null : r.firebaseUid);
+  }
+
+  async function sendRejection(r: Courier) {
+    const reason = reasonText.trim();
+    if (reason.length < 5) {
+      setError("Write a reason for the rider (at least 5 characters).");
+      return;
+    }
+    const ok = await setStatus(r, COURIER_STATUS.REJECTED, undefined, reason);
+    if (ok) {
+      setRejectUid(null);
+      setReasonText("");
     }
   }
 
@@ -108,7 +160,7 @@ export default function RidersPage() {
         <button
           key="reject"
           disabled={busy}
-          onClick={() => setStatus(r, COURIER_STATUS.REJECTED, `Reject ${r.name}'s application?`)}
+          onClick={() => openReject(r)}
           className={`${btn} border border-slate-300 text-slate-700`}
         >
           Reject
@@ -213,7 +265,11 @@ export default function RidersPage() {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setRejectUid(null);
+              setReasonText("");
+            }}
             aria-pressed={tab === t.key}
             className={`rounded-lg px-3 py-2 ${
               tab === t.key
@@ -236,18 +292,19 @@ export default function RidersPage() {
       )}
 
       {listLoading ? (
-        <p className="text-sm text-slate-400">Loading...</p>
+        <ListSkeleton />
       ) : riders.length === 0 ? (
         <p className="text-sm text-slate-400">{EMPTY_TEXT[tab]}</p>
       ) : (
         <div className="space-y-3">
           {riders.map((r) => {
             const buttons = actions(r);
+            const busy = busyUid === r.firebaseUid;
             return (
               <article key={r._id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900">
                       {r.name}
                       {r.status === COURIER_STATUS.APPROVED && (
                         <span
@@ -256,6 +313,11 @@ export default function RidersPage() {
                           }`}
                         >
                           {r.isOnline ? "Online" : "Offline"}
+                        </span>
+                      )}
+                      {r.status === COURIER_STATUS.PENDING && r.resubmittedAt && (
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                          New document sent
                         </span>
                       )}
                     </p>
@@ -268,6 +330,11 @@ export default function RidersPage() {
                       {r.vehicleType}
                       {r.vehiclePlate ? ` · ${r.vehiclePlate}` : ""} · Joined {dateTime(r.createdAt)}
                     </p>
+                    {r.status === COURIER_STATUS.PENDING && r.resubmittedAt && (
+                      <p className="mt-1 text-xs text-blue-700">
+                        Sent a new document on {dateTime(r.resubmittedAt)}
+                      </p>
+                    )}
                     {(r.idNumber || r.idPhotoUrl) && (
                       <p className="mt-1 text-xs text-slate-500">
                         {r.idNumber && <>ID number: {r.idNumber}</>}
@@ -287,6 +354,67 @@ export default function RidersPage() {
                   </div>
                   {buttons.length > 0 && <div className="flex shrink-0 flex-wrap justify-end gap-2">{buttons}</div>}
                 </div>
+
+                {r.status === COURIER_STATUS.REJECTED && (
+                  <div className="mt-3 space-y-1">
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                      <span className="font-semibold">Reason the rider sees:</span>{" "}
+                      {r.rejectionReason || "No reason was saved for this one."}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Waiting for the rider to upload a new document. It will move to Pending when they do.
+                    </p>
+                  </div>
+                )}
+
+                {rejectUid === r.firebaseUid && (
+                  <div className="mt-3 space-y-3 rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-700">
+                      Tell {r.name} what to fix. They will see this and can upload a new document.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {REASON_CHIPS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setReasonText(c)}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:text-slate-900"
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={reasonText}
+                      onChange={(e) => setReasonText(e.target.value)}
+                      maxLength={300}
+                      rows={3}
+                      placeholder="Reason (at least 5 characters)"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || reasonText.trim().length < 5}
+                        onClick={() => sendRejection(r)}
+                        className={`${btn} bg-red-600 text-white disabled:opacity-40`}
+                      >
+                        Reject and send reason
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setRejectUid(null);
+                          setReasonText("");
+                        }}
+                        className={`${btn} border border-slate-300 text-slate-700`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </article>
             );
           })}
