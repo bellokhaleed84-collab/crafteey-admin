@@ -19,6 +19,7 @@ import {
   Star,
   Flag,
   ShieldAlert,
+  AlertTriangle,
   FileText,
   Settings,
   Users,
@@ -78,6 +79,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Support",
     items: [
+      { label: "Safety alerts", href: "/safety-alerts", icon: AlertTriangle, permission: "riders.view", ready: true },
       { label: "Support & Complaints", href: "/support", icon: LifeBuoy, permission: "support.view", ready: true },
       { label: "Chat reports", href: "/chat-reports", icon: Flag, permission: "chat.moderate", ready: true },
       { label: "Blocked messages", href: "/blocked-messages", icon: ShieldAlert, permission: "chat.moderate", ready: true },
@@ -146,6 +148,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const { user, loading, access, accessMessage, admin, can, signOut, getIdToken, refreshAccess } = useAdminAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [newRequestCount, setNewRequestCount] = useState<number | null>(null);
+  const [openSosCount, setOpenSosCount] = useState<number | null>(null);
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -181,6 +184,31 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     const interval = setInterval(fetchBadge, 30000);
     return () => clearInterval(interval);
   }, [isPublicRoute, access, canSeeRequests, fetchBadge]);
+
+  // Red badge for open SOS alerts, only for people who can see that page.
+  const canSeeSafety = can("riders.view");
+  const fetchSosBadge = useCallback(async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+      const res = await fetch("/api/admin/safety-alerts?status=open&page=1", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => ({}));
+      if (typeof data?.openSos === "number") setOpenSosCount(data.openSos);
+    } catch {
+      // A missed poll isn't worth surfacing.
+    }
+  }, [getIdToken]);
+
+  useEffect(() => {
+    if (isPublicRoute || access !== "ok" || !canSeeSafety) return;
+    fetchSosBadge();
+    const interval = setInterval(fetchSosBadge, 30000);
+    return () => clearInterval(interval);
+  }, [isPublicRoute, access, canSeeSafety, fetchSosBadge]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -252,7 +280,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const badge = item.href === "/requests" ? newRequestCount : null;
+                const isSafety = item.href === "/safety-alerts";
+                const badge = item.href === "/requests" ? newRequestCount : isSafety ? openSosCount : null;
                 const active = isActive(item.href);
                 return (
                   <li key={item.href}>
@@ -269,7 +298,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                         {!!badge && (
                           <span
                             className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                              active ? "bg-slate-900 text-white" : "bg-amber-400 text-slate-900"
+                              isSafety
+                                ? "bg-red-600 text-white"
+                                : active
+                                  ? "bg-slate-900 text-white"
+                                  : "bg-amber-400 text-slate-900"
                             }`}
                           >
                             {badge}
