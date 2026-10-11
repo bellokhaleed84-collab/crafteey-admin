@@ -16,8 +16,8 @@ export interface ITicketMessage {
 }
 
 export interface ISupportTicket {
-  // "rider" for tickets from the rider app. Older tickets have no value and count as customers.
-  userType?: "client" | "rider";
+  // "rider" = rider app, "vendor" = vendor app. Older tickets have no value and count as customers.
+  userType?: "client" | "rider" | "vendor";
   clientUid: string;
   clientName: string;
   clientEmail: string;
@@ -45,7 +45,7 @@ const MessageSchema = new Schema<ITicketMessage>({
 
 const SupportTicketSchema = new Schema<ISupportTicket>(
   {
-    userType: { type: String, enum: ["client", "rider"], default: "client" },
+    userType: { type: String, enum: ["client", "rider", "vendor"], default: "client" },
     clientUid: { type: String, required: true },
     clientName: { type: String, default: "" },
     clientEmail: { type: String, default: "" },

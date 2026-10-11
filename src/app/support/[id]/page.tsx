@@ -25,6 +25,10 @@ type Ticket = {
 
 const POLL_MS = 5000;
 
+function whoOf(userType?: string): string {
+  return userType === "rider" ? "Rider" : userType === "vendor" ? "Vendor" : "Customer";
+}
+
 export default function SupportTicketPage() {
   const { id } = useParams<{ id: string }>();
   const { getIdToken, can } = useAdminAuth();
@@ -107,7 +111,7 @@ export default function SupportTicketPage() {
 
   async function setStatus(status: "in_progress" | "fixed") {
     if (busy) return;
-    const who = ticket?.userType === "rider" ? "rider" : "customer";
+    const who = whoOf(ticket?.userType).toLowerCase();
     if (
       status === "fixed" &&
       !window.confirm(`Mark this problem as fixed? The chat closes right away and the ${who} can no longer reply.`)
@@ -134,8 +138,7 @@ export default function SupportTicketPage() {
   }
 
   const fixed = ticket?.status === "fixed";
-  const isRider = ticket?.userType === "rider";
-  const whoLabel = isRider ? "Rider" : "Customer";
+  const whoLabel = whoOf(ticket?.userType);
 
   return (
     <div>

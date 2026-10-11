@@ -27,6 +27,10 @@ type TicketDoc = {
   fixedBy?: string;
 };
 
+function kind(t?: string): "rider" | "vendor" | "client" {
+  return t === "rider" ? "rider" : t === "vendor" ? "vendor" : "client";
+}
+
 /** GET /api/admin/support/tickets/[id] -> the report and its chat. Clears the admin unread count. */
 export async function GET(req: NextRequest, { params }: Ctx) {
   try {
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({
       ticket: {
         id: String(t._id),
-        userType: t.userType === "rider" ? "rider" : "client",
+        userType: kind(t.userType),
         clientName: t.clientName ?? "",
         clientEmail: t.clientEmail ?? "",
         clientPhone: t.clientPhone ?? "",
@@ -84,10 +88,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     await connectToDatabase();
 
-    const before = (await SupportTicket.findById(params.id).select("status subject clientName").lean()) as unknown as {
+    const before = (await SupportTicket.findById(params.id)
+      .select("status subject clientName userType")
+      .lean()) as unknown as {
       status?: string;
       subject?: string;
       clientName?: string;
+      userType?: string;
     } | null;
     if (!before) return NextResponse.json({ error: "Report not found" }, { status: 404 });
     if (before.status === "fixed") {
@@ -103,11 +110,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "This report is already fixed and closed." }, { status: 409 });
     }
 
+    const who = kind(before.userType) === "client" ? "customer" : kind(before.userType);
     await logAudit(admin, {
       action: status === "fixed" ? "support_ticket.fixed" : "support_ticket.in_progress",
       targetType: "SupportTicket",
       targetId: params.id,
-      summary: `Support report from ${before.clientName || "customer"} (${before.subject || "no subject"}): ${before.status} -> ${status}`,
+      summary: `Support report from ${before.clientName || who} (${before.subject || "no subject"}): ${before.status} -> ${status}`,
     });
 
     return NextResponse.json({ ok: true });

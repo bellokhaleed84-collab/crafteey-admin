@@ -23,7 +23,15 @@ const WHO = [
   { value: "", label: "Everyone" },
   { value: "client", label: "Customers" },
   { value: "rider", label: "Riders" },
+  { value: "vendor", label: "Vendors" },
 ];
+
+const TAG_STYLE: Record<string, string> = {
+  rider: "bg-purple-50 text-purple-700",
+  vendor: "bg-emerald-50 text-emerald-700",
+  client: "bg-blue-50 text-blue-700",
+};
+const TAG_LABEL: Record<string, string> = { rider: "Rider", vendor: "Vendor", client: "Customer" };
 
 function RowSkeletons() {
   return (
@@ -81,7 +89,7 @@ export default function SupportListPage() {
     <div>
       <h1 className="text-2xl font-bold text-slate-900">Support</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Problems customers and riders reported from the apps. Reply in the chat, then mark it fixed.
+        Problems customers, riders and vendors reported from the apps. Reply in the chat, then mark it fixed.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -137,10 +145,10 @@ export default function SupportListPage() {
                     <p className="flex flex-wrap items-center gap-2 truncate text-sm font-bold text-slate-900">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          r.userType === "rider" ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700"
+                          TAG_STYLE[r.userType] || TAG_STYLE.client
                         }`}
                       >
-                        {r.userType === "rider" ? "Rider" : "Customer"}
+                        {TAG_LABEL[r.userType] || "Customer"}
                       </span>
                       {r.clientName} - {CATEGORY_LABELS[r.category] || r.category}
                     </p>

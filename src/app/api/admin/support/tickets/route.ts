@@ -20,7 +20,13 @@ type Row = {
   unreadAdmin?: number;
 };
 
-/** GET /api/admin/support/tickets?status=open|in_progress|fixed|all&who=client|rider&page=1 */
+function kind(t?: string): "rider" | "vendor" | "client" {
+  return t === "rider" ? "rider" : t === "vendor" ? "vendor" : "client";
+}
+
+const DEFAULT_NAME = { rider: "Rider", vendor: "Vendor", client: "Customer" } as const;
+
+/** GET /api/admin/support/tickets?status=open|in_progress|fixed|all&who=client|rider|vendor&page=1 */
 export async function GET(req: NextRequest) {
   try {
     const admin = await requirePermission(req, "support.view");
@@ -33,9 +39,11 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(sp.get("page") || "1", 10) || 1);
 
     // Who filter also applies to the tab counts.
+    // Customers = everything that is not a rider or a vendor (older tickets have no userType).
     const scope: Record<string, unknown> = {};
     if (who === "rider") scope.userType = "rider";
-    if (who === "client") scope.userType = { $ne: "rider" };
+    if (who === "vendor") scope.userType = "vendor";
+    if (who === "client") scope.userType = { $nin: ["rider", "vendor"] };
 
     const filter: Record<string, unknown> = { ...scope };
     if ((TICKET_STATUSES as readonly string[]).includes(status)) filter.status = status;
@@ -58,17 +66,20 @@ export async function GET(req: NextRequest) {
     for (const g of grouped) counts[g._id] = g.n;
 
     return NextResponse.json({
-      tickets: rows.map((r) => ({
-        id: String(r._id),
-        userType: r.userType === "rider" ? "rider" : "client",
-        clientName: r.clientName || (r.userType === "rider" ? "Rider" : "Customer"),
-        category: r.category ?? "",
-        subject: r.subject ?? "",
-        status: r.status ?? "open",
-        lastMessage: r.lastMessage ?? "",
-        lastMessageAt: r.lastMessageAt,
-        unreadAdmin: r.unreadAdmin ?? 0,
-      })),
+      tickets: rows.map((r) => {
+        const k = kind(r.userType);
+        return {
+          id: String(r._id),
+          userType: k,
+          clientName: r.clientName || DEFAULT_NAME[k],
+          category: r.category ?? "",
+          subject: r.subject ?? "",
+          status: r.status ?? "open",
+          lastMessage: r.lastMessage ?? "",
+          lastMessageAt: r.lastMessageAt,
+          unreadAdmin: r.unreadAdmin ?? 0,
+        };
+      }),
       counts,
       page,
       pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
