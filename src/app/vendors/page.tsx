@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { HUB_CATEGORIES, HUB_CATEGORY_LABELS, TIER_LABELS, type HubCategory } from "@/lib/hubCategories";
+import { dateTime } from "@/lib/format";
 
 type VendorRow = {
   _id: string;
@@ -14,14 +15,20 @@ type VendorRow = {
   tierRequest?: { requestedTier?: string; status?: string };
   status?: string;
   isApproved?: boolean;
+  resubmittedAt?: string | null;
 };
+
+type VendorDoc = { _id?: string; type?: string; url: string; uploadedAt?: string };
 
 type VendorDetail = VendorRow & {
   uid: string;
   address: string;
   description?: string;
   tagline?: string;
+  pickupInstructions?: string;
+  rejectionReason?: string;
   verificationDocUrl?: string;
+  businessDocuments?: VendorDoc[];
   bankDetails?: { accountName?: string; accountNumber?: string; bankName?: string };
 };
 
@@ -42,6 +49,20 @@ const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700",
 };
 
+const DOC_LABELS: Record<string, string> = {
+  cac: "CAC certificate",
+  id: "ID card",
+  other: "Other document",
+};
+
+// Quick reasons the admin can tap to fill the box, then edit.
+const REASON_CHIPS = [
+  "The document photo is blurry or cut off.",
+  "The document is not valid or has expired.",
+  "The business name on the document does not match your store.",
+  "We need a clearer photo of your CAC certificate or ID.",
+];
+
 // Suggest a Hub category from the vendor's free-text category. The admin can change it.
 function suggestCategories(text: string): HubCategory[] {
   const t = (text || "").toLowerCase();
@@ -61,6 +82,31 @@ function StatusBadge({ status }: { status?: string }) {
   const s = status && STATUS_STYLE[status] ? status : "pending";
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold capitalize ${STATUS_STYLE[s]}`}>{s}</span>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="divide-y divide-slate-100" aria-busy="true">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="animate-pulse px-4 py-3">
+          <div className="h-4 w-1/3 rounded bg-slate-200" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PanelSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4" aria-busy="true">
+      <div className="h-6 w-2/3 rounded bg-slate-200" />
+      <div className="h-4 w-1/3 rounded bg-slate-100" />
+      <div className="h-24 rounded-xl bg-slate-100" />
+      <div className="h-24 rounded-xl bg-slate-100" />
+      <div className="h-40 rounded-xl bg-slate-100" />
+    </div>
   );
 }
 
@@ -168,7 +214,7 @@ export default function VendorsPage() {
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         {loading ? (
-          <p className="p-6 text-sm text-slate-500">Loading…</p>
+          <ListSkeleton />
         ) : rows.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No vendors here.</p>
         ) : (
@@ -190,6 +236,11 @@ export default function VendorsPage() {
                   {v.tierRequest?.status === "pending" && (
                     <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
                       Wants {v.tierRequest.requestedTier}
+                    </span>
+                  )}
+                  {v.status === "pending" && v.resubmittedAt && (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                      New document sent
                     </span>
                   )}
                   {v.status === "approved" && !v.isApproved && (
@@ -262,6 +313,8 @@ function VendorPanel({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [reasonFor, setReasonFor] = useState<"reject" | "suspend" | null>(null);
+  const [reasonText, setReasonText] = useState("");
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -284,7 +337,7 @@ function VendorPanel({
     void fetchDetail();
   }, [fetchDetail]);
 
-  async function run(path: string, body: unknown, okMsg: string) {
+  async function run(path: string, body: unknown, okMsg: string): Promise<boolean> {
     setBusy(true);
     setErr("");
     setMsg("");
@@ -293,8 +346,10 @@ function VendorPanel({
       setMsg(okMsg);
       await fetchDetail();
       onChanged();
+      return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Action failed");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -304,19 +359,41 @@ function VendorPanel({
     const parsed = parseCoords(coords);
     if (cats.length === 0) return setErr("Pick at least one Hub category.");
     if (!parsed) return setErr("Enter coordinates like 6.5244, 3.3792 (latitude, longitude).");
-    void run(`/api/admin/vendors/${id}`, { action: "approve", categories: cats, lat: parsed.lat, lng: parsed.lng }, "Vendor approved and live in the Hub.");
+    void run(
+      `/api/admin/vendors/${id}`,
+      { action: "approve", categories: cats, lat: parsed.lat, lng: parsed.lng },
+      "Vendor approved and live in the Hub."
+    );
   }
 
-  function confirmAction(action: "reject" | "suspend") {
-    const word = action === "reject" ? "reject" : "suspend";
-    if (window.confirm(`Are you sure you want to ${word} this vendor? Their Hub store will be hidden.`)) {
-      void run(`/api/admin/vendors/${id}`, { action }, action === "reject" ? "Vendor rejected." : "Vendor suspended.");
+  function startReason(action: "reject" | "suspend") {
+    setErr("");
+    setMsg("");
+    setReasonText("");
+    setReasonFor(reasonFor === action ? null : action);
+  }
+
+  async function sendReason() {
+    if (!reasonFor) return;
+    const reason = reasonText.trim();
+    if (reason.length < 5) return setErr("Write a reason for the vendor (at least 5 characters).");
+    const ok = await run(
+      `/api/admin/vendors/${id}`,
+      { action: reasonFor, reason },
+      reasonFor === "reject"
+        ? "Vendor rejected. They can see your reason."
+        : "Vendor suspended. They can see your reason."
+    );
+    if (ok) {
+      setReasonFor(null);
+      setReasonText("");
     }
   }
 
   const mapsUrl = vendor ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(vendor.address || "")}` : "#";
   const status = vendor?.status && STATUS_STYLE[vendor.status] ? vendor.status : "pending";
   const approveLabel = status === "approved" ? "Save & re-sync" : status === "pending" ? "Approve" : "Approve / reinstate";
+  const docs = vendor?.businessDocuments ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -327,7 +404,7 @@ function VendorPanel({
         </button>
 
         {!vendor ? (
-          <p className="text-sm text-slate-500">{err || "Loading…"}</p>
+          err ? <p className="text-sm text-red-700">{err}</p> : <PanelSkeleton />
         ) : (
           <div className="space-y-5">
             <div>
@@ -341,6 +418,18 @@ function VendorPanel({
                   Status says approved but the approval switch is off. Use &quot;Save &amp; re-sync&quot; below to fix it.
                 </p>
               )}
+              {(vendor.status === "rejected" || vendor.status === "suspended") && (
+                <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">
+                  <span className="font-semibold">Reason the vendor sees:</span>{" "}
+                  {vendor.rejectionReason || "No reason was saved for this one."}
+                </p>
+              )}
+              {vendor.status === "pending" && vendor.resubmittedAt && (
+                <p className="mt-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-700">
+                  Sent a new document on {dateTime(vendor.resubmittedAt)}
+                  {vendor.rejectionReason ? `. Earlier rejection: ${vendor.rejectionReason}` : "."}
+                </p>
+              )}
             </div>
 
             <dl className="space-y-1 text-sm">
@@ -349,12 +438,31 @@ function VendorPanel({
               <Row label="Phone" value={vendor.phone} />
               <Row label="Address" value={vendor.address} />
               {vendor.tagline && <Row label="Tagline" value={vendor.tagline} />}
+              {vendor.pickupInstructions && <Row label="Pickup note" value={vendor.pickupInstructions} />}
             </dl>
 
             {canReview && (
-              <div className="space-y-1 rounded-xl bg-slate-50 p-3 text-sm">
-                <p className="text-xs font-bold uppercase text-slate-400">Verification and bank</p>
-                {vendor.verificationDocUrl ? (
+              <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
+                <p className="text-xs font-bold uppercase text-slate-400">Documents and bank</p>
+                {docs.length > 0 ? (
+                  <ul className="space-y-2">
+                    {docs.map((d, i) => (
+                      <li key={d._id || i} className="flex items-center gap-3">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={d.url} alt="" className="h-12 w-12 rounded-lg border border-slate-200 object-cover" />
+                        </a>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-800">{DOC_LABELS[d.type || ""] || "Document"}</p>
+                          {d.uploadedAt && <p className="text-xs text-slate-500">{dateTime(d.uploadedAt)}</p>}
+                        </div>
+                        <a href={d.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-600 underline">
+                          Open
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : vendor.verificationDocUrl ? (
                   <a href={vendor.verificationDocUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 underline">
                     Open verification document
                   </a>
@@ -462,13 +570,63 @@ function VendorPanel({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => confirmAction(status === "approved" ? "suspend" : "reject")}
+                      onClick={() => startReason(status === "approved" ? "suspend" : "reject")}
                       className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-600 disabled:opacity-50"
                     >
                       {status === "approved" ? "Suspend" : "Reject"}
                     </button>
                   )}
                 </div>
+
+                {reasonFor && (
+                  <div className="space-y-3 rounded-lg bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-700">
+                      Tell {vendor.businessName} why. They will see this on their status screen
+                      {reasonFor === "reject" ? " and can upload a new document." : "."}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {REASON_CHIPS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setReasonText(c)}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:text-slate-900"
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={reasonText}
+                      onChange={(e) => setReasonText(e.target.value)}
+                      maxLength={300}
+                      rows={3}
+                      placeholder="Reason (at least 5 characters)"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || reasonText.trim().length < 5}
+                        onClick={() => void sendReason()}
+                        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                      >
+                        {reasonFor === "reject" ? "Reject and send reason" : "Suspend and send reason"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setReasonFor(null);
+                          setReasonText("");
+                        }}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -43,7 +43,9 @@ export async function GET(req: NextRequest) {
     const tabNames = Object.keys(TAB_FILTERS);
     const [vendors, total, ...countValues] = await Promise.all([
       Vendor.find(filter)
-        .select("businessName category email phone tier tierRequest status isApproved isOpen createdAt")
+        .select(
+          "businessName category email phone tier tierRequest status isApproved isOpen resubmittedAt createdAt"
+        )
         .sort({ createdAt: -1 })
         .skip((page - 1) * PAGE_SIZE)
         .limit(PAGE_SIZE)

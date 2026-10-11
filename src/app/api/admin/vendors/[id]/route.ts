@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (!canReview) {
       delete safe.bankDetails;
       delete safe.verificationDocUrl;
+      delete safe.businessDocuments;
     }
     return NextResponse.json({ vendor: safe, hubVendor, canReview });
   } catch (err) {
@@ -40,7 +41,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 /**
  * PATCH /api/admin/vendors/[id]
- * body: { action: "approve" | "reject" | "suspend", categories?, lat?, lng? }
+ * body: { action: "approve" | "reject" | "suspend", categories?, lat?, lng?, reason? }
+ * "reject" and "suspend" need a reason (the vendor sees it on their status screen).
  * "approve" also works on an already approved vendor (re-syncs the HubVendor) and
  * is how a suspended or rejected vendor is reinstated.
  * status is the source of truth; isApproved always follows it.
@@ -85,7 +87,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       const tier = isVendorTier(vendor.tier) ? vendor.tier : "regular";
 
-      await Vendor.updateOne({ _id: params.id }, { $set: { status: "approved", isApproved: true } });
+      // Approving clears any old rejection or suspension reason.
+      await Vendor.updateOne(
+        { _id: params.id },
+        { $set: { status: "approved", isApproved: true, rejectionReason: "", resubmittedAt: null } }
+      );
 
       const onInsert: Record<string, unknown> = { isOpen: !!vendor.isOpen };
       if (vendor.logoUrl) onInsert.logoUrl = vendor.logoUrl;
@@ -114,7 +120,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         // Don't leave the vendor "approved" with no store in the Hub.
         await Vendor.updateOne(
           { _id: params.id },
-          { $set: { status: before.status || "pending", isApproved: !!before.isApproved } }
+          {
+            $set: {
+              status: before.status || "pending",
+              isApproved: !!before.isApproved,
+              rejectionReason: vendor.rejectionReason ?? "",
+              resubmittedAt: vendor.resubmittedAt ?? null,
+            },
+          }
         );
         throw hubErr;
       }
@@ -130,11 +143,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ ok: true });
     }
 
-    // reject or suspend
+    // reject or suspend: the vendor must be told why
+    const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 300) : "";
+    if (reason.length < 5) {
+      return NextResponse.json(
+        { error: "Write a reason for the vendor (at least 5 characters)." },
+        { status: 400 }
+      );
+    }
+
     const newStatus = action === "reject" ? "rejected" : "suspended";
     await Vendor.updateOne(
       { _id: params.id },
-      { $set: { status: newStatus, isApproved: false, isOpen: false } }
+      {
+        $set: {
+          status: newStatus,
+          isApproved: false,
+          isOpen: false,
+          rejectionReason: reason,
+          resubmittedAt: null,
+        },
+      }
     );
     await HubVendor.updateOne({ ownerUid: vendor.uid }, { $set: { isActive: false, isOpen: false } });
 
@@ -142,9 +171,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       action: action === "reject" ? "vendor.reject" : "vendor.suspend",
       targetType: "Vendor",
       targetId: params.id,
-      summary: `${action === "reject" ? "Rejected" : "Suspended"} vendor ${vendor.businessName}`,
+      summary: `${action === "reject" ? "Rejected" : "Suspended"} vendor ${vendor.businessName} (${reason})`,
       before,
-      after: { status: newStatus, isApproved: false },
+      after: { status: newStatus, isApproved: false, rejectionReason: reason },
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

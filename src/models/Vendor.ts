@@ -2,7 +2,8 @@ import mongoose, { Schema, type Model } from "mongoose";
 
 // Copy of crafteey-vendor's Vendor (same "vendors" collection). autoIndex is off so
 // this app never creates indexes on a collection the vendor app owns. The admin
-// writes only status, isApproved, isOpen, tier and tierRequest.status.
+// writes only status, isApproved, isOpen, tier, tierRequest.status, rejectionReason
+// and resubmittedAt.
 export interface IVendor {
   uid: string;
   businessName: string;
@@ -16,6 +17,10 @@ export interface IVendor {
   tagline?: string;
   bankDetails?: { accountName?: string; accountNumber?: string; bankName?: string };
   verificationDocUrl?: string;
+  businessDocuments?: { type?: string; url?: string; uploadedAt?: Date }[];
+  rejectionReason?: string;
+  resubmittedAt?: Date | null;
+  pickupInstructions?: string;
   tier?: string;
   tierRequest?: { requestedTier?: string; status?: string; requestedAt?: Date };
   status: string;
@@ -24,6 +29,12 @@ export interface IVendor {
   createdAt: Date;
   updatedAt: Date;
 }
+
+const BusinessDocumentSchema = new Schema({
+  type: { type: String },
+  url: String,
+  uploadedAt: Date,
+});
 
 const VendorSchema = new Schema<IVendor>(
   {
@@ -39,6 +50,10 @@ const VendorSchema = new Schema<IVendor>(
     tagline: String,
     bankDetails: { accountName: String, accountNumber: String, bankName: String },
     verificationDocUrl: String,
+    businessDocuments: [BusinessDocumentSchema],
+    rejectionReason: String,
+    resubmittedAt: Date,
+    pickupInstructions: String,
     tier: String,
     tierRequest: { _id: false, requestedTier: String, status: String, requestedAt: Date },
     status: String,
